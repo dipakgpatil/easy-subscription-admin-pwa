@@ -1,0 +1,20 @@
+<svg width="512" height="160" viewBox="0 0 512 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="160" rx="36" fill="#091A18"/>
+  <rect x="24" y="24" width="112" height="112" rx="28" fill="url(#panel)"/>
+  <path d="M55 96C55 67.2812 78.2812 44 107 44H112C140.719 44 164 67.2812 164 96V110H55V96Z" fill="#0D231F"/>
+  <path d="M79 110V72H101V110" stroke="#F7F3EA" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M118 110V58H140V110" stroke="#FF5A36" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="150" cy="54" r="14" fill="#C5FF00"/>
+  <path d="M171 86H206" stroke="#FFB62E" stroke-width="8" stroke-linecap="round"/>
+  <path d="M171 102H220" stroke="#FFB62E" stroke-width="8" stroke-linecap="round"/>
+  <path d="M171 118H232" stroke="#FFB62E" stroke-width="8" stroke-linecap="round"/>
+  <text x="248" y="73" fill="#F7F3EA" font-family="Verdana, Geneva, sans-serif" font-size="24" font-weight="700">cravix</text>
+  <text x="248" y="105" fill="#FFB62E" font-family="Verdana, Geneva, sans-serif" font-size="28" font-weight="700">admin</text>
+  <text x="248" y="128" fill="#9AB0AA" font-family="Verdana, Geneva, sans-serif" font-size="13" font-weight="600">operations control tower</text>
+  <defs>
+    <linearGradient id="panel" x1="24" y1="24" x2="136" y2="136" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#163531"/>
+      <stop offset="1" stop-color="#102724"/>
+    </linearGradient>
+  </defs>
+</svg>

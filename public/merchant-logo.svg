@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 180">
+  <defs>
+    <linearGradient id="merchantGradient" x1="24" x2="176" y1="14" y2="168" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffd6df"/>
+      <stop offset="0.45" stop-color="#ff8aa5"/>
+      <stop offset="1" stop-color="#f55378"/>
+    </linearGradient>
+    <linearGradient id="ticketGradient" x1="52" x2="154" y1="54" y2="138" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#fff1f4"/>
+    </linearGradient>
+  </defs>
+  <rect x="14" y="12" width="152" height="152" rx="40" fill="#fff7f9"/>
+  <path d="M36 42c0-14 12-26 26-26h56l48 48v56c0 24-20 44-44 44H62c-14 0-26-12-26-26V42Z" fill="url(#merchantGradient)"/>
+  <path d="M118 16v26c0 12 10 22 22 22h26" fill="#ffc1cf"/>
+  <path d="M60 58c0-7 6-13 13-13h56c7 0 13 6 13 13v52c0 7-6 13-13 13H73c-7 0-13-6-13-13V58Z" fill="url(#ticketGradient)"/>
+  <path d="M82 96c0-14 12-26 26-26s26 12 26 26" fill="none" stroke="#f55378" stroke-linecap="round" stroke-width="8"/>
+  <path d="M76 98h64" stroke="#f55378" stroke-linecap="round" stroke-width="8"/>
+  <circle cx="148" cy="72" r="16" fill="#2f1820"/>
+  <path d="M148 61v11" stroke="#fff" stroke-linecap="round" stroke-width="5"/>
+  <circle cx="148" cy="80" r="2.6" fill="#fff"/>
+  <text x="204" y="86" fill="#2f1820" font-family="Manrope, Arial, sans-serif" font-size="48" font-weight="800">Easy Commerce</text>
+  <text x="204" y="128" fill="#b64563" font-family="DM Sans, Arial, sans-serif" font-size="28" font-weight="700" letter-spacing="1.5">MERCHANT DESK</text>
+</svg>

@@ -1,0 +1,17 @@
+{
+  "name": "Cravix Admin",
+  "short_name": "Admin",
+  "description": "Operational control tower for Cravix orders, riders, zones, and merchant payouts.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#091a18",
+  "theme_color": "#0d231f",
+  "icons": [
+    {
+      "src": "/admin-icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
