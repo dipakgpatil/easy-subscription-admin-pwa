@@ -199,3 +199,59 @@ export type AdminDashboard = {
   attention_orders: AdminOrderListItem[]
   recent_orders: AdminOrderListItem[]
 }
+
+export type AdminReferralConfig = {
+  enabled: boolean
+  startAt: string | null
+  endAt: string | null
+  referrerRewardPoints: string
+  referrerRewardAmount: string
+  refereeRewardPoints: string
+  refereeRewardAmount: string
+  pointsToCurrencyRate: string
+  minimumOrderValue: string
+  maxReferralsPerUser: number
+  maxEarningsPerUser: string
+  maxWalletUsagePercent: string
+  testMode: boolean
+}
+
+export type AdminReferralAnalytics = {
+  totalReferralsSent: number
+  totalSignedUp: number
+  successfulConversions: number
+  referredRevenue: string
+  totalRewardsDistributed: string
+  pendingRewardsAmount: string
+}
+
+export type AdminReferralListItem = {
+  id: number
+  referrerName: string | null
+  referrerEmail: string | null
+  referralCode: string
+  refereeName: string | null
+  refereeMobile: string | null
+  status: string
+  rewardStatus: string
+  qualifyingOrderNo: number | null
+  referrerRewardAmount: string
+  refereeRewardAmount: string
+  createdAt: string | null
+  qualifiedAt: string | null
+  rewardedAt: string | null
+  rejectionReason: string | null
+}
+
+export type AdminReferralListResult = {
+  total: number
+  page: number
+  pageSize: number
+  items: AdminReferralListItem[]
+}
+
+export type AdminWalletCreditResponse = {
+  result: string
+  walletAmount: string
+  totalPoints: string
+}

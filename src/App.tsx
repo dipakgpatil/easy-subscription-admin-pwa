@@ -3,17 +3,23 @@ import './App.css'
 import {
   ApiError,
   appConfig,
+  creditReferralWallet,
   getDashboard,
   getMerchantPayoutDetail,
   getMerchantPayouts,
   getOrderDetail,
+  getReferralAnalytics,
+  getReferralConfig,
+  getReferralList,
   getRiders,
   loginAdminWithGoogleIdToken,
   loginAdminWithMockGoogleProfile,
   markMerchantPayoutPaid,
   requestAdminOtp,
+  runReferralTest,
   searchOrders,
   updateOrderStatus,
+  updateReferralConfig,
   verifyAdminOtp,
 } from './lib/api'
 import { clearSession, readActiveTab, readSession, writeActiveTab, writeSession } from './lib/storage'
@@ -25,11 +31,15 @@ import type {
   AdminOrderDetail,
   AdminOrderListItem,
   AdminOrderSearchResult,
+  AdminReferralAnalytics,
+  AdminReferralConfig,
+  AdminReferralListResult,
   AdminRiderListResult,
   AdminSession,
+  AdminWalletCreditResponse,
 } from './lib/types'
 
-type ViewTab = 'overview' | 'orders' | 'riders' | 'payouts'
+type ViewTab = 'overview' | 'orders' | 'riders' | 'payouts' | 'referrals'
 type LoginMode = 'google' | 'otp'
 
 const ORDER_ACTIONS = ['ACCEPTED', 'PREPARING', 'READY', 'ASSIGNED', 'IN_TRANSIT', 'COMPLETED'] as const
@@ -93,11 +103,35 @@ function nextActionsForStatus(status: string): string[] {
   return ORDER_ACTIONS.slice(currentIndex + 1)
 }
 
+function toDateTimeInputValue(value: string | null | undefined): string {
+  if (!value) {
+    return ''
+  }
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    return value
+  }
+  const year = parsed.getFullYear()
+  const month = String(parsed.getMonth() + 1).padStart(2, '0')
+  const day = String(parsed.getDate()).padStart(2, '0')
+  const hours = String(parsed.getHours()).padStart(2, '0')
+  const minutes = String(parsed.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day}T${hours}:${minutes}`
+}
+
+function normalizeReferralConfigForForm(config: AdminReferralConfig): AdminReferralConfig {
+  return {
+    ...config,
+    startAt: toDateTimeInputValue(config.startAt),
+    endAt: toDateTimeInputValue(config.endAt),
+  }
+}
+
 function App() {
   const [session, setSession] = useState<AdminSession | null>(() => readSession())
   const [activeTab, setActiveTab] = useState<ViewTab>(() => {
     const stored = readActiveTab()
-    if (stored === 'overview' || stored === 'orders' || stored === 'riders' || stored === 'payouts') {
+    if (stored === 'overview' || stored === 'orders' || stored === 'riders' || stored === 'payouts' || stored === 'referrals') {
       return stored
     }
     return 'overview'
@@ -109,6 +143,9 @@ function App() {
   const [selectedOrder, setSelectedOrder] = useState<AdminOrderDetail | null>(null)
   const [riders, setRiders] = useState<AdminRiderListResult | null>(null)
   const [payouts, setPayouts] = useState<AdminMerchantPayoutSummaryResult | null>(null)
+  const [referralConfig, setReferralConfig] = useState<AdminReferralConfig | null>(null)
+  const [referralAnalytics, setReferralAnalytics] = useState<AdminReferralAnalytics | null>(null)
+  const [referralList, setReferralList] = useState<AdminReferralListResult | null>(null)
   const [selectedMerchantUid, setSelectedMerchantUid] = useState<number | null>(null)
   const [selectedPayout, setSelectedPayout] = useState<AdminMerchantPayoutDetail | null>(null)
   const [googleEmail, setGoogleEmail] = useState('ops.cravix@gmail.com')
@@ -122,8 +159,21 @@ function App() {
   const [ordersPage, setOrdersPage] = useState(1)
   const [payoutQuery, setPayoutQuery] = useState('')
   const [payoutPage, setPayoutPage] = useState(1)
+  const [referralQuery, setReferralQuery] = useState('')
+  const [referralStatus, setReferralStatus] = useState('')
+  const [referralRewardStatus, setReferralRewardStatus] = useState('')
+  const [referralPage, setReferralPage] = useState(1)
   const [payoutReference, setPayoutReference] = useState('')
   const [payoutNote, setPayoutNote] = useState('')
+  const [referralRefereeUserId, setReferralRefereeUserId] = useState('')
+  const [referralCodeDraft, setReferralCodeDraft] = useState('')
+  const [referralDeviceId, setReferralDeviceId] = useState('')
+  const [referralOrderNo, setReferralOrderNo] = useState('')
+  const [walletCreditUserId, setWalletCreditUserId] = useState('')
+  const [walletCreditPoints, setWalletCreditPoints] = useState('50')
+  const [walletCreditNote, setWalletCreditNote] = useState('Manual referral test credit')
+  const [referralTestResult, setReferralTestResult] = useState<string | null>(null)
+  const [walletCreditResult, setWalletCreditResult] = useState<AdminWalletCreditResponse | null>(null)
   const [assignmentDrafts, setAssignmentDrafts] = useState<Record<number, string>>({})
   const [loadingKey, setLoadingKey] = useState<string | null>(null)
   const [lastError, setLastError] = useState<string | null>(null)
@@ -131,6 +181,7 @@ function App() {
   const googleButtonRef = useRef<HTMLDivElement | null>(null)
   const deferredOrderQuery = useDeferredValue(orderQuery)
   const deferredPayoutQuery = useDeferredValue(payoutQuery)
+  const deferredReferralQuery = useDeferredValue(referralQuery)
 
   const zoneOptions = dashboard?.zone_summary ?? []
   const liveRiders = riders?.items.filter((rider) => rider.latitude !== null && rider.longitude !== null) ?? []
@@ -264,6 +315,26 @@ function App() {
     setSelectedPayout(payload)
   })
 
+  const loadReferralAdmin = useEffectEvent(async () => {
+    if (!session) {
+      return
+    }
+    const [configPayload, analyticsPayload, listPayload] = await Promise.all([
+      getReferralConfig(session.access_token),
+      getReferralAnalytics(session.access_token),
+      getReferralList(session.access_token, {
+        page: referralPage,
+        pageSize: 20,
+        query: deferredReferralQuery,
+        status: referralStatus || undefined,
+        rewardStatus: referralRewardStatus || undefined,
+      }),
+    ])
+    setReferralConfig(normalizeReferralConfigForForm(configPayload))
+    setReferralAnalytics(analyticsPayload)
+    setReferralList(listPayload)
+  })
+
   const refreshActiveView = useEffectEvent(async () => {
     if (!session) {
       return
@@ -282,6 +353,9 @@ function App() {
         await loadPayouts()
         await loadSelectedPayout()
       }
+      if (activeTab === 'referrals') {
+        await loadReferralAdmin()
+      }
     } catch (error) {
       setLastError(getErrorMessage(error))
     }
@@ -291,7 +365,7 @@ function App() {
     if (session) {
       void refreshActiveView()
     }
-  }, [session, activeTab, deferredOrderQuery, zoneFilter, ordersPage, deferredPayoutQuery, payoutPage])
+  }, [session, activeTab, deferredOrderQuery, zoneFilter, ordersPage, deferredPayoutQuery, payoutPage, deferredReferralQuery, referralStatus, referralRewardStatus, referralPage])
 
   useEffect(() => {
     if (!session || activeTab !== 'orders' || selectedOrderNo === null) {
@@ -315,7 +389,7 @@ function App() {
       void refreshActiveView()
     }, appConfig.dashboardPollIntervalMs)
     return () => window.clearInterval(intervalId)
-  }, [session, activeTab, deferredOrderQuery, zoneFilter, ordersPage, deferredPayoutQuery, payoutPage])
+  }, [session, activeTab, deferredOrderQuery, zoneFilter, ordersPage, deferredPayoutQuery, payoutPage, deferredReferralQuery, referralStatus, referralRewardStatus, referralPage])
 
   useEffect(() => {
     if (appConfig.googleClientId && window.google?.accounts?.id) {
@@ -406,6 +480,96 @@ function App() {
     }
   }
 
+  async function handleSaveReferralConfig() {
+    if (!session || !referralConfig) {
+      return
+    }
+    setLoadingKey('referral-config')
+    setLastError(null)
+    setReferralTestResult(null)
+    try {
+      const payload = await updateReferralConfig(session.access_token, {
+        enabled: referralConfig.enabled,
+        startAt: referralConfig.startAt || null,
+        endAt: referralConfig.endAt || null,
+        referrerRewardPoints: referralConfig.referrerRewardPoints,
+        refereeRewardPoints: referralConfig.refereeRewardPoints,
+        pointsToCurrencyRate: referralConfig.pointsToCurrencyRate,
+        minimumOrderValue: referralConfig.minimumOrderValue,
+        maxReferralsPerUser: referralConfig.maxReferralsPerUser,
+        maxEarningsPerUser: referralConfig.maxEarningsPerUser,
+        maxWalletUsagePercent: referralConfig.maxWalletUsagePercent,
+        testMode: referralConfig.testMode,
+      })
+      setReferralConfig(normalizeReferralConfigForForm(payload))
+      await loadReferralAdmin()
+      setReferralTestResult('Referral configuration updated.')
+    } catch (error) {
+      setLastError(getErrorMessage(error))
+    } finally {
+      setLoadingKey(null)
+    }
+  }
+
+  async function handleReferralSimulation(mode: 'LINK_SIGNUP' | 'SETTLE_FIRST_ORDER' | 'REVERSE_REWARD') {
+    if (!session) {
+      return
+    }
+    const refereeUserId = Number.parseInt(referralRefereeUserId.trim(), 10)
+    if (!Number.isFinite(refereeUserId)) {
+      setLastError('Enter a valid referee user id.')
+      return
+    }
+    const qualifyingOrderNo = referralOrderNo.trim()
+      ? Number.parseInt(referralOrderNo.trim(), 10)
+      : undefined
+    setLoadingKey(`referral-test-${mode}`)
+    setLastError(null)
+    setReferralTestResult(null)
+    try {
+      const response = await runReferralTest(session.access_token, {
+        mode,
+        refereeUserId,
+        referralCode: referralCodeDraft.trim() || undefined,
+        deviceId: referralDeviceId.trim() || undefined,
+        qualifyingOrderNo,
+      })
+      setReferralTestResult(response.result)
+      await loadReferralAdmin()
+    } catch (error) {
+      setLastError(getErrorMessage(error))
+    } finally {
+      setLoadingKey(null)
+    }
+  }
+
+  async function handleWalletCredit() {
+    if (!session) {
+      return
+    }
+    const userId = Number.parseInt(walletCreditUserId.trim(), 10)
+    if (!Number.isFinite(userId)) {
+      setLastError('Enter a valid user id for wallet credit.')
+      return
+    }
+    setLoadingKey('wallet-credit')
+    setLastError(null)
+    setWalletCreditResult(null)
+    try {
+      const response = await creditReferralWallet(session.access_token, {
+        userId,
+        pointsAmount: walletCreditPoints.trim(),
+        note: walletCreditNote.trim() || undefined,
+      })
+      setWalletCreditResult(response)
+      await loadReferralAdmin()
+    } catch (error) {
+      setLastError(getErrorMessage(error))
+    } finally {
+      setLoadingKey(null)
+    }
+  }
+
   function openOrder(item: AdminOrderListItem) {
     startTransition(() => {
       setActiveTab('orders')
@@ -431,6 +595,11 @@ function App() {
     setPayouts(null)
     setSelectedMerchantUid(null)
     setSelectedPayout(null)
+    setReferralConfig(null)
+    setReferralAnalytics(null)
+    setReferralList(null)
+    setReferralTestResult(null)
+    setWalletCreditResult(null)
   }
 
   if (!session) {
@@ -538,6 +707,7 @@ function App() {
             ['orders', 'Orders'],
             ['riders', 'Riders'],
             ['payouts', 'Payouts'],
+            ['referrals', 'Referrals'],
           ].map(([tab, label]) => (
             <button
               key={tab}
@@ -568,6 +738,7 @@ function App() {
               {activeTab === 'orders' && 'Order search and intervention'}
               {activeTab === 'riders' && 'Rider live operations'}
               {activeTab === 'payouts' && 'Merchant payout desk'}
+              {activeTab === 'referrals' && 'Referral campaign desk'}
             </h1>
           </div>
           <div className="topbar-actions">
@@ -1042,6 +1213,317 @@ function App() {
               ) : (
                 <EmptyState title="Select a merchant" body="Choose a merchant from the left panel to inspect due amounts and mark payouts settled." />
               )}
+            </section>
+          </section>
+        ) : null}
+
+        {activeTab === 'referrals' ? (
+          <section className="split-layout">
+            <section className="panel detail-panel">
+              <div className="panel-head">
+                <div>
+                  <p className="section-kicker">Campaign</p>
+                  <h2>Referral rewards and wallet rules</h2>
+                </div>
+              </div>
+
+              <div className="stats-grid">
+                <StatCard label="Referrals Sent" value={String(referralAnalytics?.totalReferralsSent ?? 0)} tone="warning" />
+                <StatCard label="Signed Up" value={String(referralAnalytics?.totalSignedUp ?? 0)} tone="neutral" />
+                <StatCard label="Successful" value={String(referralAnalytics?.successfulConversions ?? 0)} tone="positive" />
+                <StatCard label="Revenue" value={formatMoney(referralAnalytics?.referredRevenue)} tone="warning" />
+                <StatCard label="Rewards Distributed" value={formatMoney(referralAnalytics?.totalRewardsDistributed)} tone="positive" />
+                <StatCard label="Pending Rewards" value={formatMoney(referralAnalytics?.pendingRewardsAmount)} tone="neutral" />
+              </div>
+
+              {referralConfig ? (
+                <div className="referral-admin-grid">
+                  <div className="settlement-box">
+                    <div className="panel-head compact">
+                      <div>
+                        <p className="section-kicker">Config</p>
+                        <h2>Launch controls</h2>
+                      </div>
+                    </div>
+                    <label className="checkbox-row">
+                      <input
+                        type="checkbox"
+                        checked={referralConfig.enabled}
+                        onChange={(event) =>
+                          setReferralConfig((current) => (current ? { ...current, enabled: event.target.checked } : current))
+                        }
+                      />
+                      <span>Referral campaign enabled</span>
+                    </label>
+                    <label className="checkbox-row">
+                      <input
+                        type="checkbox"
+                        checked={referralConfig.testMode}
+                        onChange={(event) =>
+                          setReferralConfig((current) => (current ? { ...current, testMode: event.target.checked } : current))
+                        }
+                      />
+                      <span>Test mode enabled</span>
+                    </label>
+                    <div className="inline-grid">
+                      <label>
+                        Campaign start
+                        <input
+                          type="datetime-local"
+                          value={referralConfig.startAt ?? ''}
+                          onChange={(event) =>
+                            setReferralConfig((current) => (current ? { ...current, startAt: event.target.value || null } : current))
+                          }
+                        />
+                      </label>
+                      <label>
+                        Campaign end
+                        <input
+                          type="datetime-local"
+                          value={referralConfig.endAt ?? ''}
+                          onChange={(event) =>
+                            setReferralConfig((current) => (current ? { ...current, endAt: event.target.value || null } : current))
+                          }
+                        />
+                      </label>
+                      <label>
+                        Referrer reward points
+                        <input
+                          value={referralConfig.referrerRewardPoints}
+                          onChange={(event) =>
+                            setReferralConfig((current) =>
+                              current ? { ...current, referrerRewardPoints: event.target.value } : current,
+                            )
+                          }
+                        />
+                      </label>
+                      <label>
+                        Referee reward points
+                        <input
+                          value={referralConfig.refereeRewardPoints}
+                          onChange={(event) =>
+                            setReferralConfig((current) =>
+                              current ? { ...current, refereeRewardPoints: event.target.value } : current,
+                            )
+                          }
+                        />
+                      </label>
+                      <label>
+                        Points to INR rate
+                        <input
+                          value={referralConfig.pointsToCurrencyRate}
+                          onChange={(event) =>
+                            setReferralConfig((current) =>
+                              current ? { ...current, pointsToCurrencyRate: event.target.value } : current,
+                            )
+                          }
+                        />
+                      </label>
+                      <label>
+                        Minimum first order
+                        <input
+                          value={referralConfig.minimumOrderValue}
+                          onChange={(event) =>
+                            setReferralConfig((current) =>
+                              current ? { ...current, minimumOrderValue: event.target.value } : current,
+                            )
+                          }
+                        />
+                      </label>
+                      <label>
+                        Max referrals per user
+                        <input
+                          type="number"
+                          min={0}
+                          value={referralConfig.maxReferralsPerUser}
+                          onChange={(event) =>
+                            setReferralConfig((current) =>
+                              current ? { ...current, maxReferralsPerUser: Number.parseInt(event.target.value || '0', 10) || 0 } : current,
+                            )
+                          }
+                        />
+                      </label>
+                      <label>
+                        Max earnings per user
+                        <input
+                          value={referralConfig.maxEarningsPerUser}
+                          onChange={(event) =>
+                            setReferralConfig((current) =>
+                              current ? { ...current, maxEarningsPerUser: event.target.value } : current,
+                            )
+                          }
+                        />
+                      </label>
+                      <label>
+                        Max wallet usage %
+                        <input
+                          value={referralConfig.maxWalletUsagePercent}
+                          onChange={(event) =>
+                            setReferralConfig((current) =>
+                              current ? { ...current, maxWalletUsagePercent: event.target.value } : current,
+                            )
+                          }
+                        />
+                      </label>
+                    </div>
+                    <button className="primary-button" onClick={() => void handleSaveReferralConfig()} disabled={loadingKey === 'referral-config'}>
+                      {loadingKey === 'referral-config' ? 'Saving...' : 'Save referral settings'}
+                    </button>
+                  </div>
+
+                  <div className="settlement-box">
+                    <div className="panel-head compact">
+                      <div>
+                        <p className="section-kicker">Test Mode</p>
+                        <h2>Simulate and credit</h2>
+                      </div>
+                    </div>
+                    <div className="inline-grid">
+                      <label>
+                        Referee user id
+                        <input value={referralRefereeUserId} onChange={(event) => setReferralRefereeUserId(event.target.value)} placeholder="102" />
+                      </label>
+                      <label>
+                        Referral code
+                        <input value={referralCodeDraft} onChange={(event) => setReferralCodeDraft(event.target.value)} placeholder="ABCD1234" />
+                      </label>
+                      <label>
+                        Device id
+                        <input value={referralDeviceId} onChange={(event) => setReferralDeviceId(event.target.value)} placeholder="test-device-01" />
+                      </label>
+                      <label>
+                        Qualifying order no
+                        <input value={referralOrderNo} onChange={(event) => setReferralOrderNo(event.target.value)} placeholder="401" />
+                      </label>
+                    </div>
+                    <div className="topbar-actions">
+                      <button className="ghost-button" onClick={() => void handleReferralSimulation('LINK_SIGNUP')} disabled={loadingKey === 'referral-test-LINK_SIGNUP'}>
+                        {loadingKey === 'referral-test-LINK_SIGNUP' ? 'Linking...' : 'Simulate signup'}
+                      </button>
+                      <button className="ghost-button" onClick={() => void handleReferralSimulation('SETTLE_FIRST_ORDER')} disabled={loadingKey === 'referral-test-SETTLE_FIRST_ORDER'}>
+                        {loadingKey === 'referral-test-SETTLE_FIRST_ORDER' ? 'Settling...' : 'Simulate first order'}
+                      </button>
+                      <button className="secondary-button" onClick={() => void handleReferralSimulation('REVERSE_REWARD')} disabled={loadingKey === 'referral-test-REVERSE_REWARD'}>
+                        {loadingKey === 'referral-test-REVERSE_REWARD' ? 'Reversing...' : 'Reverse reward'}
+                      </button>
+                    </div>
+                    <div className="inline-grid">
+                      <label>
+                        Wallet credit user id
+                        <input value={walletCreditUserId} onChange={(event) => setWalletCreditUserId(event.target.value)} placeholder="102" />
+                      </label>
+                      <label>
+                        Points amount
+                        <input value={walletCreditPoints} onChange={(event) => setWalletCreditPoints(event.target.value)} placeholder="50" />
+                      </label>
+                    </div>
+                    <label>
+                      Wallet credit note
+                      <textarea value={walletCreditNote} onChange={(event) => setWalletCreditNote(event.target.value)} rows={3} />
+                    </label>
+                    <button className="primary-button" onClick={() => void handleWalletCredit()} disabled={loadingKey === 'wallet-credit'}>
+                      {loadingKey === 'wallet-credit' ? 'Crediting...' : 'Credit test wallet'}
+                    </button>
+                    {referralTestResult ? <p className="muted-line">{referralTestResult}</p> : null}
+                    {walletCreditResult ? (
+                      <p className="muted-line">
+                        {walletCreditResult.result} • Balance {formatMoney(walletCreditResult.walletAmount)} • {walletCreditResult.totalPoints} points
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              ) : (
+                <EmptyState title="Referral config unavailable" body="Refresh the page once the backend referral endpoints are reachable." />
+              )}
+            </section>
+
+            <section className="panel list-panel">
+              <div className="panel-head compact">
+                <div>
+                  <p className="section-kicker">Referrals</p>
+                  <h2>Conversion and reward queue</h2>
+                </div>
+              </div>
+              <div className="filter-grid filter-grid--triple">
+                <label>
+                  Search
+                  <input
+                    value={referralQuery}
+                    onChange={(event) => {
+                      setReferralPage(1)
+                      setReferralQuery(event.target.value)
+                    }}
+                    placeholder="Referrer, referee, email, code"
+                  />
+                </label>
+                <label>
+                  Status
+                  <select
+                    value={referralStatus}
+                    onChange={(event) => {
+                      setReferralPage(1)
+                      setReferralStatus(event.target.value)
+                    }}
+                  >
+                    <option value="">All statuses</option>
+                    <option value="INVITED">Invited</option>
+                    <option value="SIGNED_UP">Signed up</option>
+                    <option value="FIRST_ORDER_DONE">First order done</option>
+                    <option value="REVERSED">Reversed</option>
+                  </select>
+                </label>
+                <label>
+                  Reward
+                  <select
+                    value={referralRewardStatus}
+                    onChange={(event) => {
+                      setReferralPage(1)
+                      setReferralRewardStatus(event.target.value)
+                    }}
+                  >
+                    <option value="">All rewards</option>
+                    <option value="PENDING">Pending</option>
+                    <option value="CREDITED">Credited</option>
+                    <option value="REVERSED">Reversed</option>
+                  </select>
+                </label>
+              </div>
+              <div className="order-stack">
+                {(referralList?.items ?? []).map((item) => (
+                  <article key={item.id} className="list-card referral-row-card">
+                    <div className="list-card-top">
+                      <div>
+                        <strong>{item.referrerName ?? 'Unknown referrer'}</strong>
+                        <span>{item.referrerEmail ?? item.referralCode}</span>
+                      </div>
+                      <span className={`badge ${badgeTone(item.rewardStatus)}`}>{item.rewardStatus}</span>
+                    </div>
+                    <p>{item.refereeName ?? item.refereeMobile ?? 'Referee still pending profile details'}</p>
+                    <div className="meta-row">
+                      <span>{item.status.replaceAll('_', ' ')}</span>
+                      <span>
+                        {formatMoney(item.referrerRewardAmount)} + {formatMoney(item.refereeRewardAmount)}
+                      </span>
+                    </div>
+                    <div className="tag-row">
+                      <span className="tiny-flag">{item.referralCode}</span>
+                      {item.qualifyingOrderNo ? <span className="tiny-flag">Order #{item.qualifyingOrderNo}</span> : null}
+                      {item.rejectionReason ? <span className="tiny-flag warning">{item.rejectionReason}</span> : null}
+                    </div>
+                    <small>
+                      Invited {formatDateTime(item.createdAt)}{item.rewardedAt ? ` • Rewarded ${formatDateTime(item.rewardedAt)}` : ''}
+                    </small>
+                  </article>
+                ))}
+                {referralList?.items.length === 0 ? <EmptyState title="No referral relationships" body="Try clearing the filters or simulate one in test mode." /> : null}
+              </div>
+              <PaginationBar
+                page={referralList?.page ?? referralPage}
+                total={referralList?.total ?? 0}
+                pageSize={referralList?.pageSize ?? 20}
+                onPrevious={() => setReferralPage((current) => Math.max(1, current - 1))}
+                onNext={() => setReferralPage((current) => current + 1)}
+              />
             </section>
           </section>
         ) : null}

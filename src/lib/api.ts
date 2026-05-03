@@ -4,8 +4,12 @@ import type {
   AdminMerchantPayoutSummaryResult,
   AdminOrderDetail,
   AdminOrderSearchResult,
+  AdminReferralAnalytics,
+  AdminReferralConfig,
+  AdminReferralListResult,
   AdminRiderListResult,
   AdminSession,
+  AdminWalletCreditResponse,
 } from './types'
 
 const DEFAULT_API_BASE_URL = 'https://easy-subscription-python-api-production.up.railway.app/api/v1'
@@ -24,6 +28,117 @@ export class ApiError extends Error {
   constructor(message: string, status: number) {
     super(message)
     this.status = status
+  }
+}
+
+function pickValue<T>(payload: Record<string, unknown>, camelKey: string, snakeKey: string): T | undefined {
+  if (camelKey in payload) {
+    return payload[camelKey] as T
+  }
+  if (snakeKey in payload) {
+    return payload[snakeKey] as T
+  }
+  return undefined
+}
+
+function normalizeReferralConfig(payload: Record<string, unknown>): AdminReferralConfig {
+  return {
+    enabled: Boolean(payload.enabled),
+    startAt: pickValue<string | null>(payload, 'startAt', 'start_at') ?? null,
+    endAt: pickValue<string | null>(payload, 'endAt', 'end_at') ?? null,
+    referrerRewardPoints: String(
+      pickValue<string | number>(payload, 'referrerRewardPoints', 'referrer_reward_points') ?? '0',
+    ),
+    referrerRewardAmount: String(
+      pickValue<string | number>(payload, 'referrerRewardAmount', 'referrer_reward_amount') ?? '0',
+    ),
+    refereeRewardPoints: String(
+      pickValue<string | number>(payload, 'refereeRewardPoints', 'referee_reward_points') ?? '0',
+    ),
+    refereeRewardAmount: String(
+      pickValue<string | number>(payload, 'refereeRewardAmount', 'referee_reward_amount') ?? '0',
+    ),
+    pointsToCurrencyRate: String(
+      pickValue<string | number>(payload, 'pointsToCurrencyRate', 'points_to_currency_rate') ?? '1',
+    ),
+    minimumOrderValue: String(
+      pickValue<string | number>(payload, 'minimumOrderValue', 'minimum_order_value') ?? '0',
+    ),
+    maxReferralsPerUser: Number(
+      pickValue<number | string>(payload, 'maxReferralsPerUser', 'max_referrals_per_user') ?? 0,
+    ),
+    maxEarningsPerUser: String(
+      pickValue<string | number>(payload, 'maxEarningsPerUser', 'max_earnings_per_user') ?? '0',
+    ),
+    maxWalletUsagePercent: String(
+      pickValue<string | number>(payload, 'maxWalletUsagePercent', 'max_wallet_usage_percent') ?? '0',
+    ),
+    testMode: Boolean(pickValue<boolean>(payload, 'testMode', 'test_mode')),
+  }
+}
+
+function normalizeReferralAnalytics(payload: Record<string, unknown>): AdminReferralAnalytics {
+  return {
+    totalReferralsSent: Number(
+      pickValue<number | string>(payload, 'totalReferralsSent', 'total_referrals_sent') ?? 0,
+    ),
+    totalSignedUp: Number(
+      pickValue<number | string>(payload, 'totalSignedUp', 'total_signed_up') ?? 0,
+    ),
+    successfulConversions: Number(
+      pickValue<number | string>(payload, 'successfulConversions', 'successful_conversions') ?? 0,
+    ),
+    referredRevenue: String(
+      pickValue<string | number>(payload, 'referredRevenue', 'referred_revenue') ?? '0',
+    ),
+    totalRewardsDistributed: String(
+      pickValue<string | number>(payload, 'totalRewardsDistributed', 'total_rewards_distributed') ?? '0',
+    ),
+    pendingRewardsAmount: String(
+      pickValue<string | number>(payload, 'pendingRewardsAmount', 'pending_rewards_amount') ?? '0',
+    ),
+  }
+}
+
+function normalizeReferralList(payload: Record<string, unknown>): AdminReferralListResult {
+  const rawItems = Array.isArray(payload.items) ? payload.items : []
+  return {
+    total: Number(payload.total ?? 0),
+    page: Number(payload.page ?? 1),
+    pageSize: Number(pickValue<number | string>(payload, 'pageSize', 'page_size') ?? 20),
+    items: rawItems.map((entry) => {
+      const item = entry as Record<string, unknown>
+      return {
+        id: Number(item.id ?? 0),
+        referrerName: pickValue<string | null>(item, 'referrerName', 'referrer_name') ?? null,
+        referrerEmail: pickValue<string | null>(item, 'referrerEmail', 'referrer_email') ?? null,
+        referralCode: String(pickValue<string>(item, 'referralCode', 'referral_code') ?? ''),
+        refereeName: pickValue<string | null>(item, 'refereeName', 'referee_name') ?? null,
+        refereeMobile: pickValue<string | null>(item, 'refereeMobile', 'referee_mobile') ?? null,
+        status: String(item.status ?? ''),
+        rewardStatus: String(pickValue<string>(item, 'rewardStatus', 'reward_status') ?? ''),
+        qualifyingOrderNo:
+          pickValue<number | null>(item, 'qualifyingOrderNo', 'qualifying_order_no') ?? null,
+        referrerRewardAmount: String(
+          pickValue<string | number>(item, 'referrerRewardAmount', 'referrer_reward_amount') ?? '0',
+        ),
+        refereeRewardAmount: String(
+          pickValue<string | number>(item, 'refereeRewardAmount', 'referee_reward_amount') ?? '0',
+        ),
+        createdAt: pickValue<string | null>(item, 'createdAt', 'created_at') ?? null,
+        qualifiedAt: pickValue<string | null>(item, 'qualifiedAt', 'qualified_at') ?? null,
+        rewardedAt: pickValue<string | null>(item, 'rewardedAt', 'rewarded_at') ?? null,
+        rejectionReason: pickValue<string | null>(item, 'rejectionReason', 'rejection_reason') ?? null,
+      }
+    }),
+  }
+}
+
+function normalizeWalletCreditResponse(payload: Record<string, unknown>): AdminWalletCreditResponse {
+  return {
+    result: String(payload.result ?? ''),
+    walletAmount: String(pickValue<string | number>(payload, 'walletAmount', 'wallet_amount') ?? '0'),
+    totalPoints: String(pickValue<string | number>(payload, 'totalPoints', 'total_points') ?? '0'),
   }
 }
 
@@ -167,4 +282,84 @@ export async function markMerchantPayoutPaid(
     token,
     body: payload,
   })
+}
+
+export async function getReferralConfig(token: string): Promise<AdminReferralConfig> {
+  const payload = await request<Record<string, unknown>>('/admin/referrals/config', { token })
+  return normalizeReferralConfig(payload)
+}
+
+export async function updateReferralConfig(
+  token: string,
+  payload: {
+    enabled: boolean
+    startAt: string | null
+    endAt: string | null
+    referrerRewardPoints: string
+    refereeRewardPoints: string
+    pointsToCurrencyRate: string
+    minimumOrderValue: string
+    maxReferralsPerUser: number
+    maxEarningsPerUser: string
+    maxWalletUsagePercent: string
+    testMode: boolean
+  },
+): Promise<AdminReferralConfig> {
+  const responsePayload = await request<Record<string, unknown>>('/admin/referrals/config', {
+    method: 'PUT',
+    token,
+    body: payload,
+  })
+  return normalizeReferralConfig(responsePayload)
+}
+
+export async function getReferralAnalytics(token: string): Promise<AdminReferralAnalytics> {
+  const payload = await request<Record<string, unknown>>('/admin/referrals/analytics', { token })
+  return normalizeReferralAnalytics(payload)
+}
+
+export async function getReferralList(
+  token: string,
+  query: {
+    page?: number
+    pageSize?: number
+    query?: string
+    status?: string
+    rewardStatus?: string
+  } = {},
+): Promise<AdminReferralListResult> {
+  const payload = await request<Record<string, unknown>>('/admin/referrals', {
+    token,
+    query,
+  })
+  return normalizeReferralList(payload)
+}
+
+export async function runReferralTest(
+  token: string,
+  payload: {
+    mode: string
+    refereeUserId: number
+    referralCode?: string
+    deviceId?: string
+    qualifyingOrderNo?: number
+  },
+): Promise<{ result: string }> {
+  return request<{ result: string }>('/admin/referrals/test', {
+    method: 'POST',
+    token,
+    body: payload,
+  })
+}
+
+export async function creditReferralWallet(
+  token: string,
+  payload: { userId: number; pointsAmount: string; note?: string },
+): Promise<AdminWalletCreditResponse> {
+  const responsePayload = await request<Record<string, unknown>>('/admin/referrals/wallet-credit', {
+    method: 'POST',
+    token,
+    body: payload,
+  })
+  return normalizeWalletCreditResponse(responsePayload)
 }
