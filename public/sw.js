@@ -1,5 +1,5 @@
-const SHELL_CACHE = 'cravix-admin-shell-v1'
-const RUNTIME_CACHE = 'cravix-admin-runtime-v1'
+const SHELL_CACHE = 'cravix-admin-shell-v2'
+const RUNTIME_CACHE = 'cravix-admin-runtime-v2'
 const SHELL_ASSETS = ['/', '/index.html', '/manifest.webmanifest', '/admin-icon.svg', '/admin-logo.svg']
 
 self.addEventListener('install', (event) => {
@@ -9,7 +9,12 @@ self.addEventListener('install', (event) => {
 })
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim())
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((key) => ![SHELL_CACHE, RUNTIME_CACHE].includes(key)).map((key) => caches.delete(key))))
+      .then(() => self.clients.claim()),
+  )
 })
 
 self.addEventListener('fetch', (event) => {

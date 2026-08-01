@@ -1,5 +1,6 @@
-import { startTransition, useDeferredValue, useEffect, useEffectEvent, useRef, useState } from 'react'
+import { startTransition, useCallback, useDeferredValue, useEffect, useEffectEvent, useRef, useState } from 'react'
 import './App.css'
+import ObservabilityView from './features/observability/ObservabilityView'
 import {
   ApiError,
   appConfig,
@@ -39,7 +40,7 @@ import type {
   AdminWalletCreditResponse,
 } from './lib/types'
 
-type ViewTab = 'overview' | 'orders' | 'riders' | 'payouts' | 'referrals'
+type ViewTab = 'overview' | 'orders' | 'riders' | 'payouts' | 'referrals' | 'errors' | 'security'
 type LoginMode = 'google' | 'otp'
 
 const ORDER_ACTIONS = ['ACCEPTED', 'PREPARING', 'READY', 'ASSIGNED', 'IN_TRANSIT', 'COMPLETED'] as const
@@ -131,7 +132,7 @@ function App() {
   const [session, setSession] = useState<AdminSession | null>(() => readSession())
   const [activeTab, setActiveTab] = useState<ViewTab>(() => {
     const stored = readActiveTab()
-    if (stored === 'overview' || stored === 'orders' || stored === 'riders' || stored === 'payouts' || stored === 'referrals') {
+    if (stored === 'overview' || stored === 'orders' || stored === 'riders' || stored === 'payouts' || stored === 'referrals' || stored === 'errors' || stored === 'security') {
       return stored
     }
     return 'overview'
@@ -244,15 +245,15 @@ function App() {
     }
   }
 
-  const loadOverview = useEffectEvent(async () => {
+  const loadOverview = useCallback(async () => {
     if (!session) {
       return
     }
     const payload = await getDashboard(session.access_token)
     setDashboard(payload)
-  })
+  }, [session])
 
-  const loadOrders = useEffectEvent(async () => {
+  const loadOrders = useCallback(async () => {
     if (!session) {
       return
     }
@@ -263,32 +264,34 @@ function App() {
       zoneCode: zoneFilter || undefined,
     })
     setOrders(payload)
-    if (payload.items.length > 0 && !payload.items.some((item) => item.order_no === selectedOrderNo)) {
-      setSelectedOrderNo(payload.items[0].order_no)
-    }
+    setSelectedOrderNo((current) =>
+      payload.items.length > 0 && !payload.items.some((item) => item.order_no === current)
+        ? payload.items[0].order_no
+        : current,
+    )
     if (payload.items.length === 0) {
       setSelectedOrderNo(null)
       setSelectedOrder(null)
     }
-  })
+  }, [deferredOrderQuery, ordersPage, session, zoneFilter])
 
-  const loadSelectedOrder = useEffectEvent(async () => {
+  const loadSelectedOrder = useCallback(async () => {
     if (!session || selectedOrderNo === null) {
       return
     }
     const payload = await getOrderDetail(session.access_token, selectedOrderNo)
     setSelectedOrder(payload)
-  })
+  }, [selectedOrderNo, session])
 
-  const loadRiders = useEffectEvent(async () => {
+  const loadRiders = useCallback(async () => {
     if (!session) {
       return
     }
     const payload = await getRiders(session.access_token)
     setRiders(payload)
-  })
+  }, [session])
 
-  const loadPayouts = useEffectEvent(async () => {
+  const loadPayouts = useCallback(async () => {
     if (!session) {
       return
     }
@@ -298,24 +301,26 @@ function App() {
       query: deferredPayoutQuery,
     })
     setPayouts(payload)
-    if (payload.items.length > 0 && !payload.items.some((item) => item.merchant_uid === selectedMerchantUid)) {
-      setSelectedMerchantUid(payload.items[0].merchant_uid)
-    }
+    setSelectedMerchantUid((current) =>
+      payload.items.length > 0 && !payload.items.some((item) => item.merchant_uid === current)
+        ? payload.items[0].merchant_uid
+        : current,
+    )
     if (payload.items.length === 0) {
       setSelectedMerchantUid(null)
       setSelectedPayout(null)
     }
-  })
+  }, [deferredPayoutQuery, payoutPage, session])
 
-  const loadSelectedPayout = useEffectEvent(async () => {
+  const loadSelectedPayout = useCallback(async () => {
     if (!session || selectedMerchantUid === null) {
       return
     }
     const payload = await getMerchantPayoutDetail(session.access_token, selectedMerchantUid)
     setSelectedPayout(payload)
-  })
+  }, [selectedMerchantUid, session])
 
-  const loadReferralAdmin = useEffectEvent(async () => {
+  const loadReferralAdmin = useCallback(async () => {
     if (!session) {
       return
     }
@@ -333,10 +338,13 @@ function App() {
     setReferralConfig(normalizeReferralConfigForForm(configPayload))
     setReferralAnalytics(analyticsPayload)
     setReferralList(listPayload)
-  })
+  }, [deferredReferralQuery, referralPage, referralRewardStatus, referralStatus, session])
 
-  const refreshActiveView = useEffectEvent(async () => {
+  const refreshActiveView = useCallback(async () => {
     if (!session) {
+      return
+    }
+    if (activeTab === 'errors' || activeTab === 'security') {
       return
     }
     setLastError(null)
@@ -359,27 +367,37 @@ function App() {
     } catch (error) {
       setLastError(getErrorMessage(error))
     }
-  })
+  }, [
+    activeTab,
+    loadOrders,
+    loadOverview,
+    loadPayouts,
+    loadReferralAdmin,
+    loadRiders,
+    loadSelectedOrder,
+    loadSelectedPayout,
+    session,
+  ])
 
   useEffect(() => {
     if (session) {
       void refreshActiveView()
     }
-  }, [session, activeTab, deferredOrderQuery, zoneFilter, ordersPage, deferredPayoutQuery, payoutPage, deferredReferralQuery, referralStatus, referralRewardStatus, referralPage])
+  }, [refreshActiveView, session])
 
   useEffect(() => {
     if (!session || activeTab !== 'orders' || selectedOrderNo === null) {
       return
     }
     void loadSelectedOrder().catch((error) => setLastError(getErrorMessage(error)))
-  }, [session, activeTab, selectedOrderNo])
+  }, [session, activeTab, selectedOrderNo, loadSelectedOrder])
 
   useEffect(() => {
     if (!session || activeTab !== 'payouts' || selectedMerchantUid === null) {
       return
     }
     void loadSelectedPayout().catch((error) => setLastError(getErrorMessage(error)))
-  }, [session, activeTab, selectedMerchantUid])
+  }, [session, activeTab, selectedMerchantUid, loadSelectedPayout])
 
   useEffect(() => {
     if (!session) {
@@ -389,7 +407,7 @@ function App() {
       void refreshActiveView()
     }, appConfig.dashboardPollIntervalMs)
     return () => window.clearInterval(intervalId)
-  }, [session, activeTab, deferredOrderQuery, zoneFilter, ordersPage, deferredPayoutQuery, payoutPage, deferredReferralQuery, referralStatus, referralRewardStatus, referralPage])
+  }, [refreshActiveView, session])
 
   useEffect(() => {
     if (appConfig.googleClientId && window.google?.accounts?.id) {
@@ -708,6 +726,8 @@ function App() {
             ['riders', 'Riders'],
             ['payouts', 'Payouts'],
             ['referrals', 'Referrals'],
+            ['errors', 'Errors'],
+            ['security', 'Security'],
           ].map(([tab, label]) => (
             <button
               key={tab}
@@ -739,12 +759,16 @@ function App() {
               {activeTab === 'riders' && 'Rider live operations'}
               {activeTab === 'payouts' && 'Merchant payout desk'}
               {activeTab === 'referrals' && 'Referral campaign desk'}
+              {activeTab === 'errors' && 'Application error ledger'}
+              {activeTab === 'security' && 'Security and login activity'}
             </h1>
           </div>
           <div className="topbar-actions">
-            <button className="ghost-button" onClick={() => void refreshActiveView()}>
-              Refresh
-            </button>
+            {activeTab !== 'errors' && activeTab !== 'security' ? (
+              <button className="ghost-button" onClick={() => void refreshActiveView()}>
+                Refresh
+              </button>
+            ) : null}
           </div>
         </header>
 
@@ -859,6 +883,14 @@ function App() {
               </div>
             </section>
           </section>
+        ) : null}
+
+        {activeTab === 'errors' ? (
+          <ObservabilityView mode="errors" token={session.access_token} />
+        ) : null}
+
+        {activeTab === 'security' ? (
+          <ObservabilityView mode="security" token={session.access_token} />
         ) : null}
 
         {activeTab === 'orders' ? (

@@ -1,119 +1,59 @@
-# Easy Commerce Merchant PWA
+# Cravix Admin PWA
 
-React + TypeScript merchant dashboard for the Easy Commerce platform.
-
-This first version is built for kitchen and vendor operations:
-
-- receive merchant order alerts
-- accept new orders
-- move orders into preparation
-- mark orders ready for rider pickup
-- track handoff and completed history
-- run as a light installable web dashboard or PWA
+React and TypeScript operations console for the Cravix food-delivery platform. Administrators can monitor orders and zones, manage rider assignments, reconcile merchant payouts, operate referral campaigns, and investigate application or security events.
 
 ## Stack
 
 - React 19
 - TypeScript
 - Vite
-- browser notifications + vibration + local alert tone
+- Caddy production server
+- Google Identity Services for production administrator sign-in
 
-## Local setup
-
-1. Install dependencies:
+## Local Setup
 
 ```bash
 npm install
-```
-
-2. Create an env file if you want a different backend:
-
-```bash
-cp .env.example .env
-```
-
-3. Start the dev server:
-
-```bash
 npm run dev
 ```
 
-## Environment
+The app defaults to the production Railway API. Create `.env.local` to use another backend:
 
-`VITE_API_BASE_URL`
+```text
+VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1
+VITE_GOOGLE_CLIENT_ID=
+VITE_ALLOW_MOCK_GOOGLE=false
+VITE_APP_VERSION=local
+```
 
-- defaults to the Railway API:
-  `https://easy-subscription-python-api-production.up.railway.app/api/v1`
+Mock Google profiles are disabled by default and must remain disabled in production. The API also forcibly disables mock Google identity when `ENVIRONMENT=production`.
 
-## Branding
+## Main Screens
 
-The PWA now includes:
+- Overview: operational totals and zone load
+- Orders: search, detail, status intervention, and rider assignment
+- Riders: availability and live location status
+- Payouts: merchant balances and payout reconciliation
+- Referrals: campaign configuration, analytics, and support tools
+- Errors: backend, customer app, and admin PWA failures
+- Security: rejected access, suspicious probes, rate limits, login trail, and country signals
 
-- a custom merchant app icon in `public/merchant-icon.svg`
-- a matching wordmark in `public/merchant-logo.svg`
-- manifest and favicon wiring for installable PWA use
+Read [`OBSERVABILITY.md`](OBSERVABILITY.md) before changing telemetry or the security screens. The API repository's `OBSERVABILITY_AND_SECURITY.md` defines storage, retention, redaction, and scaling boundaries.
 
-## Demo login
-
-The current dashboard uses seeded demo merchants so the operational flow can be tested immediately:
-
-- `House Kitchen Demo`
-- `Vendor Partner Demo`
-
-These logins depend on the backend allowing mock Google profiles in the environment used for testing.
-
-## Build
+## Verification
 
 ```bash
 npm run build
+npm run lint
+npm audit --audit-level=high
 ```
 
-Production files are emitted to `dist/`.
+Production output is written to `dist/`.
 
-## Railway deployment
+## Railway Deployment
 
-Yes, this PWA can be deployed on Railway.
+The checked-in `Dockerfile`, `Caddyfile`, and `railway.json` build and serve the PWA. Use `railway.variables.example.json` as the variable template. `VITE_*` values are embedded during the image build, so changing one requires a rebuild.
 
-This repo is already prepared for it with:
+The Caddy content-security policy permits the default production API and Google Identity domains. If `VITE_API_BASE_URL` moves to another origin, add that exact HTTPS origin to `connect-src` in `Caddyfile` before deployment.
 
-- `Dockerfile`
-- `Caddyfile`
-- `railway.json`
-- `.dockerignore`
-
-### Deploy steps
-
-1. Create a new Railway service from the GitHub repo.
-2. Leave the build and start commands empty so Railway uses `railway.json` and the root `Dockerfile`.
-3. Set `VITE_API_BASE_URL` only if you want a different API target than the default Railway API.
-4. Deploy.
-
-The container builds the Vite app and serves the static PWA through Caddy.
-
-### Backend auth note
-
-If you are using the current demo merchant buttons, the backend API must allow mock Google profiles in the target environment:
-
-- `ALLOW_MOCK_GOOGLE_LOGIN=true`
-
-If you prefer production-style merchant auth, swap the demo buttons for real web Google sign-in and allow the merchant web client ID on the API service.
-
-## Alerts
-
-The dashboard polls the merchant dispatch feed and then:
-
-- shows a spotlight card for the next pending order
-- plays a local alert tone
-- triggers vibration where the browser supports it
-- can raise a browser notification when permission is granted
-
-This is intentionally foreground-friendly for the first release. Real push delivery can be added later without changing the merchant API shape.
-
-## Operational flow
-
-1. Customer places one basket order.
-2. Backend splits the basket into merchant-specific fulfillment work orders.
-3. Merchant dashboard receives an alert for each merchant-owned child work order.
-4. Merchant accepts and prepares.
-5. Merchant marks ready.
-6. Rider dispatch begins only after the order is ready.
+The production server applies CSP, HSTS, frame denial, restrictive browser permissions, immutable hashed-asset caching, and no-store caching for the application shell and service worker. Admin tokens use tab-scoped `sessionStorage`; telemetry never intentionally sends request bodies, tokens, OTPs, payment data, raw IPs, or stack traces.

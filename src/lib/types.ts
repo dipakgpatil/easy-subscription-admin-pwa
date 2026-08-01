@@ -255,3 +255,65 @@ export type AdminWalletCreditResponse = {
   walletAmount: string
   totalPoints: string
 }
+
+export type CountryActivity = {
+  country_code: string
+  login_count: number
+  unique_users: number
+  last_seen_at: string | null
+}
+
+export type ObservabilitySummary = {
+  window_hours: number
+  total_errors: number
+  backend_errors: number
+  client_errors: number
+  security_events: number
+  authentication_failures: number
+  authorization_failures: number
+  rate_limit_events: number
+  successful_logins: number
+  affected_users: number
+  anonymous_sources: number
+  country_activity: CountryActivity[]
+}
+
+export type OperationalEvent = {
+  id: number
+  event_uid: string
+  occurred_at: string
+  category: 'ERROR' | 'SECURITY' | 'AUTH'
+  event_type: string
+  severity: 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL'
+  source: string
+  user_id: number | null
+  user_display_name: string | null
+  user_email: string | null
+  anonymous_id: string | null
+  source_ip: string | null
+  country_code: string | null
+  country_source: string | null
+  network_country_code: string | null
+  network_edge: string | null
+  request_id: string | null
+  method: string | null
+  endpoint: string | null
+  flow: string | null
+  status_code: number | null
+  error_code: string | null
+  user_message: string | null
+  exception_type: string | null
+  fingerprint: string | null
+  platform: string | null
+  app_version: string | null
+  user_agent: string | null
+  duration_ms: number | null
+  integrity_valid: boolean
+}
+
+export type OperationalEventResult = {
+  total: number
+  page: number
+  pageSize: number
+  items: OperationalEvent[]
+}

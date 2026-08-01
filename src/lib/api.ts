@@ -4,6 +4,8 @@ import type {
   AdminMerchantPayoutSummaryResult,
   AdminOrderDetail,
   AdminOrderSearchResult,
+  OperationalEventResult,
+  ObservabilitySummary,
   AdminReferralAnalytics,
   AdminReferralConfig,
   AdminReferralListResult,
@@ -18,16 +20,100 @@ const API_BASE_URL = ((import.meta.env.VITE_API_BASE_URL as string | undefined) 
 export const appConfig = {
   apiBaseUrl: API_BASE_URL,
   googleClientId: ((import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) ?? '').trim(),
-  allowMockGoogle: ((import.meta.env.VITE_ALLOW_MOCK_GOOGLE as string | undefined) ?? 'true').trim() !== 'false',
+  allowMockGoogle: ((import.meta.env.VITE_ALLOW_MOCK_GOOGLE as string | undefined) ?? 'false').trim() === 'true',
   dashboardPollIntervalMs: 15000,
 }
 
 export class ApiError extends Error {
   readonly status: number
+  readonly requestId: string | null
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, requestId: string | null = null) {
     super(message)
     this.status = status
+    this.requestId = requestId
+  }
+}
+
+let reportingClientError = false
+const recentClientErrors = new Map<string, number>()
+const fallbackInstallationId =
+  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `admin-${Date.now()}-${Math.random().toString(36).slice(2)}`
+
+function clientCountry(): string | undefined {
+  const region = navigator.language.split('-')[1]?.toUpperCase()
+  return region?.length === 2 ? region : undefined
+}
+
+function installationId(): string {
+  const key = 'cravix.admin.installation-id'
+  try {
+    const existing = window.localStorage.getItem(key)
+    if (existing) return existing
+    const generated = window.crypto.randomUUID()
+    window.localStorage.setItem(key, generated)
+    return generated
+  } catch {
+    return fallbackInstallationId
+  }
+}
+
+function sanitizedClientMessage(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error)
+  return raw
+    .replace(/bearer\s+[^\s,;]+/gi, 'Bearer [REDACTED]')
+    .replace(
+      /(authorization|password|passwd|otp|secret|token|api[_-]?key)\s*[:=]\s*[^\s,;]+/gi,
+      '$1=[REDACTED]',
+    )
+    .replace(/[\r\n]+/g, ' ')
+    .slice(0, 500)
+}
+
+export async function reportAdminClientError(
+  flow: string,
+  error: unknown,
+  token?: string,
+): Promise<void> {
+  if (reportingClientError) return
+  const message = sanitizedClientMessage(error)
+  const status = error instanceof ApiError ? error.status : undefined
+  const requestId = error instanceof ApiError ? error.requestId : null
+  const dedupeKey = `${flow}|${status ?? ''}|${message}`
+  const now = Date.now()
+  if (now - (recentClientErrors.get(dedupeKey) ?? 0) < 5000) return
+  recentClientErrors.set(dedupeKey, now)
+  reportingClientError = true
+  try {
+    const country = clientCountry()
+    await fetch(`${API_BASE_URL}/telemetry/client-errors`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(country ? { 'X-Client-Country': country } : {}),
+      },
+      body: JSON.stringify({
+        source: 'ADMIN_PWA',
+        flow: flow.replace(/[\r\n]+/g, ' ').slice(0, 80),
+        message,
+        error_code: status ? `http_${status}` : 'admin_client_error',
+        status_code: status,
+        request_id: requestId,
+        occurred_at: new Date().toISOString(),
+        platform: 'WEB',
+        app_version: String(import.meta.env.VITE_APP_VERSION ?? 'unknown'),
+        installation_id: installationId(),
+      }),
+      signal: AbortSignal.timeout(5000),
+    })
+  } catch {
+    // Admin diagnostics must not hide or replace the original failure.
+  } finally {
+    reportingClientError = false
   }
 }
 
@@ -157,15 +243,32 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     }
   })
 
-  const response = await fetch(url.toString(), {
-    method: options.method ?? 'GET',
-    headers: {
-      Accept: 'application/json',
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-      ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  })
+  const country = clientCountry()
+  let response: Response
+  try {
+    response = await fetch(url.toString(), {
+      method: options.method ?? 'GET',
+      headers: {
+        Accept: 'application/json',
+        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
+        ...(country ? { 'X-Client-Country': country } : {}),
+      },
+      body: options.body ? JSON.stringify(options.body) : undefined,
+      signal: AbortSignal.timeout(20000),
+    })
+  } catch (error) {
+    const networkError = new ApiError(
+      error instanceof DOMException && error.name === 'TimeoutError'
+        ? 'The API request timed out.'
+        : 'Unable to reach the API.',
+      0,
+    )
+    if (path !== '/telemetry/client-errors') {
+      void reportAdminClientError(`${options.method ?? 'GET'} ${path}`, networkError, options.token)
+    }
+    throw networkError
+  }
 
   const payload = await response.json().catch(() => null)
   if (!response.ok) {
@@ -173,7 +276,11 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       typeof payload === 'object' && payload && 'error' in payload
         ? String((payload as { error?: { message?: string } }).error?.message ?? 'Request failed')
         : `Request failed with status ${response.status}`
-    throw new ApiError(message, response.status)
+    const error = new ApiError(message, response.status, response.headers.get('x-request-id'))
+    if (path !== '/telemetry/client-errors') {
+      void reportAdminClientError(`${options.method ?? 'GET'} ${path}`, error, options.token)
+    }
+    throw error
   }
   return payload as T
 }
@@ -362,4 +469,33 @@ export async function creditReferralWallet(
     body: payload,
   })
   return normalizeWalletCreditResponse(responsePayload)
+}
+
+export async function getObservabilitySummary(
+  token: string,
+  hours = 24,
+): Promise<ObservabilitySummary> {
+  return request<ObservabilitySummary>('/admin/observability/summary', {
+    token,
+    query: { hours },
+  })
+}
+
+export async function getOperationalEvents(
+  token: string,
+  query: {
+    page?: number
+    pageSize?: number
+    query?: string
+    category?: 'ERROR' | 'SECURITY' | 'AUTH'
+    severity?: string
+    source?: string
+    eventType?: string
+    countryCode?: string
+  },
+): Promise<OperationalEventResult> {
+  return request<OperationalEventResult>('/admin/observability/events', {
+    token,
+    query,
+  })
 }
