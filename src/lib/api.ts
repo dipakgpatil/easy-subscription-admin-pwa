@@ -1,5 +1,6 @@
 import type {
   AdminDashboard,
+  AdminOrderHistory,
   AdminCatalogProduct,
   DispatchIncident,
   DispatchIncidentResult,
@@ -326,8 +327,18 @@ export async function verifyAdminOtp(mobileNo: string, otp: string): Promise<Adm
   })
 }
 
-export async function getDashboard(token: string): Promise<AdminDashboard> {
-  return request<AdminDashboard>('/admin/dashboard', { token })
+export async function getDashboard(
+  token: string,
+  query: { zoneCode?: string } = {},
+): Promise<AdminDashboard> {
+  return request<AdminDashboard>('/admin/dashboard', { token, query })
+}
+
+export async function getOrderHistory(
+  token: string,
+  query: { zoneCode?: string; days?: number } = {},
+): Promise<AdminOrderHistory> {
+  return request<AdminOrderHistory>('/admin/order-history', { token, query })
 }
 
 export async function getProvisionedMerchants(token: string): Promise<AdminMerchantProfile[]> {

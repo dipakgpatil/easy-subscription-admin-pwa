@@ -13,6 +13,7 @@ export type AdminSession = {
 export type AdminZoneSummary = {
   zone_code: string | null
   zone_name: string | null
+  orders_today: number
   active_orders: number
   completed_today: number
   online_riders: number
@@ -24,6 +25,7 @@ export type AdminOrderListItem = {
   basket_uid: number
   order_status: string
   order_placed_on: string | null
+  completed_at: string | null
   customer_name: string | null
   customer_mobile: string | null
   delivery_address: string | null
@@ -71,6 +73,7 @@ export type AdminPaymentSummary = {
 export type AdminMerchantMini = {
   merchant_uid: number
   display_name: string
+  mobile_no: string | null
   location_label: string | null
   kitchen_type: string | null
   availability_status: string | null
@@ -117,6 +120,13 @@ export type AdminFulfillmentGroup = {
   timeline: AdminTimelineStep[]
 }
 
+export type AdminOrderJourney = {
+  current_stage: string
+  dispatch_status: string | null
+  rider: AdminRiderMini | null
+  steps: AdminTimelineStep[]
+}
+
 export type AdminOrderDetail = {
   order_no: number
   basket_uid: number
@@ -126,6 +136,7 @@ export type AdminOrderDetail = {
   customer: AdminParty
   delivery: AdminDelivery
   payment: AdminPaymentSummary
+  journey: AdminOrderJourney | null
   fulfillment_groups: AdminFulfillmentGroup[]
 }
 
@@ -222,6 +233,9 @@ export type AdminMerchantPayoutDetail = {
 }
 
 export type AdminDashboard = {
+  generated_at: string
+  zone_code: string | null
+  orders_today: number
   active_orders: number
   ready_for_pickup: number
   in_transit: number
@@ -233,6 +247,25 @@ export type AdminDashboard = {
   zone_summary: AdminZoneSummary[]
   attention_orders: AdminOrderListItem[]
   recent_orders: AdminOrderListItem[]
+}
+
+export type AdminOrderHistoryDay = {
+  date: string
+  completed_orders: number
+  gross_revenue: string
+}
+
+export type AdminOrderHistory = {
+  generated_at: string
+  zone_code: string | null
+  period_days: number
+  completed_orders: number
+  completed_today: number
+  gross_revenue: string
+  average_order_value: string
+  average_fulfillment_minutes: number | null
+  daily: AdminOrderHistoryDay[]
+  recent_completed_orders: AdminOrderListItem[]
 }
 
 export type AdminReferralConfig = {

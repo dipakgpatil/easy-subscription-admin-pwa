@@ -523,6 +523,34 @@ label {
   font-size: clamp(1.8rem, 2.8vw, 2.8rem);
 }
 
+.area-selector {
+  min-width: 210px;
+}
+
+.area-selector select {
+  min-width: 210px;
+  padding: 0.65rem 2.3rem 0.65rem 0.8rem;
+  border-radius: 12px;
+}
+
+.live-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.live-indicator::before {
+  content: '';
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--positive);
+  box-shadow: 0 0 0 4px rgba(18, 166, 109, 0.12);
+}
+
 .panel {
   padding: 1.25rem;
   border-radius: 32px;
@@ -746,6 +774,108 @@ label {
   gap: 1rem;
 }
 
+.journey-panel {
+  padding: 1rem;
+  border: 1px solid rgba(16, 39, 36, 0.1);
+  border-radius: 18px;
+  background: rgba(13, 35, 31, 0.04);
+}
+
+.journey-head,
+.history-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: start;
+}
+
+.journey-head h3,
+.history-toolbar h2 {
+  margin: 0.15rem 0 0;
+  color: var(--forest);
+}
+
+.journey-flow {
+  display: flex;
+  gap: 1.4rem;
+  overflow-x: auto;
+  margin: 1rem 0 0;
+  padding: 0 0 0.25rem;
+  list-style: none;
+}
+
+.journey-step {
+  position: relative;
+  flex: 0 0 145px;
+  display: grid;
+  gap: 0.3rem;
+  min-height: 112px;
+  padding: 0.85rem;
+  border: 1px solid rgba(16, 39, 36, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.journey-step:not(:last-child)::after {
+  content: '→';
+  position: absolute;
+  top: 42%;
+  left: calc(100% + 0.35rem);
+  color: var(--ink-soft);
+  font-size: 1.25rem;
+}
+
+.journey-step strong {
+  line-height: 1.25;
+}
+
+.journey-step small {
+  color: var(--ink-soft);
+  line-height: 1.3;
+}
+
+.journey-dot {
+  display: block;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: rgba(13, 35, 31, 0.28);
+}
+
+.journey-dot.is-positive {
+  background: var(--positive);
+}
+
+.journey-dot.is-warning {
+  background: var(--primary);
+}
+
+.contact-link,
+.contact-missing {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: fit-content;
+  color: var(--forest);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.contact-link {
+  text-decoration: none;
+}
+
+.contact-link:hover {
+  color: var(--primary-dark);
+  text-decoration: underline;
+}
+
+.contact-link span,
+.contact-missing {
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
 .fulfillment-meta,
 .timeline-grid,
 .item-list {
@@ -842,11 +972,84 @@ label {
   align-items: center;
 }
 
+.history-layout {
+  display: grid;
+  gap: 1rem;
+}
+
+.history-toolbar {
+  padding: 0 0.25rem;
+}
+
+.history-toolbar label {
+  min-width: 160px;
+}
+
+.history-toolbar select {
+  border-radius: 12px;
+  padding: 0.65rem 2.1rem 0.65rem 0.8rem;
+}
+
+.history-stats-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.history-chart {
+  display: flex;
+  align-items: end;
+  gap: 0.55rem;
+  min-height: 240px;
+  overflow-x: auto;
+  padding: 0.75rem 0.25rem 0.25rem;
+}
+
+.history-bar-column {
+  display: grid;
+  flex: 0 0 46px;
+  grid-template-rows: auto 160px auto;
+  gap: 0.45rem;
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+}
+
+.history-bar-column strong {
+  color: var(--forest);
+}
+
+.history-bar-track {
+  display: flex;
+  align-items: end;
+  overflow: hidden;
+  border-radius: 8px;
+  background: rgba(13, 35, 31, 0.07);
+}
+
+.history-bar {
+  width: 100%;
+  min-height: 5px;
+  border-radius: 8px 8px 0 0;
+  background: var(--primary);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 @media (max-width: 1200px) {
   .overview-grid,
   .split-layout,
   .catalog-setup-grid,
   .stats-grid,
+  .history-stats-grid,
   .zone-grid,
   .cards-grid,
   .auth-brand {
@@ -953,6 +1156,8 @@ label {
 
   .topbar,
   .panel-head,
+  .journey-head,
+  .history-toolbar,
   .list-card-top,
   .meta-row,
   .fulfillment-head,

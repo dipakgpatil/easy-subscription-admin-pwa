@@ -9,6 +9,7 @@ import {
   createCatalogProduct,
   creditReferralWallet,
   getDashboard,
+  getOrderHistory,
   getMerchantPayoutDetail,
   getMerchantPayouts,
   getOrderDetail,
@@ -31,6 +32,7 @@ import {
 import { clearSession, readActiveTab, readSession, writeActiveTab, writeSession } from './lib/storage'
 import type {
   AdminDashboard,
+  AdminOrderHistory,
   AdminMerchantProfile,
   AdminMerchantPayoutDetail,
   AdminMerchantPayoutSummary,
@@ -47,7 +49,7 @@ import type {
   AdminWalletCreditResponse,
 } from './lib/types'
 
-type ViewTab = 'overview' | 'catalog' | 'orders' | 'riders' | 'payouts' | 'referrals' | 'dispatch' | 'errors' | 'security'
+type ViewTab = 'overview' | 'catalog' | 'orders' | 'history' | 'riders' | 'payouts' | 'referrals' | 'dispatch' | 'errors' | 'security'
 type LoginMode = 'google' | 'otp'
 
 type CatalogProductDraft = {
@@ -113,6 +115,8 @@ function badgeTone(status: string | null | undefined): string {
     case 'IN_TRANSIT':
     case 'PREPARING':
     case 'ASSIGNED':
+    case 'IN_PROGRESS':
+    case 'PICKED_UP':
       return 'is-warning'
     case 'PENDING':
       return 'is-neutral'
@@ -153,17 +157,70 @@ function normalizeReferralConfigForForm(config: AdminReferralConfig): AdminRefer
   }
 }
 
+function phoneHref(mobileNo: string | null | undefined): string | null {
+  if (!mobileNo) {
+    return null
+  }
+  const normalized = mobileNo.trim().replace(/(?!^)\+/g, '').replace(/[^\d+]/g, '')
+  return normalized ? `tel:${normalized}` : null
+}
+
+function ContactAction({ label, mobileNo }: { label: string; mobileNo: string | null | undefined }) {
+  const href = phoneHref(mobileNo)
+  if (!href) {
+    return <span className="contact-missing">{label}: phone unavailable</span>
+  }
+  return (
+    <a className="contact-link" href={href} aria-label={`Call ${label} at ${mobileNo}`}>
+      Call {label}
+      <span>{mobileNo}</span>
+    </a>
+  )
+}
+
+function OrderJourney({ order }: { order: AdminOrderDetail }) {
+  const journey = order.journey
+  if (!journey) {
+    return null
+  }
+  return (
+    <section className="journey-panel" aria-label={`Order ${order.order_no} delivery journey`}>
+      <div className="journey-head">
+        <div>
+          <p className="section-kicker">Live order journey</p>
+          <h3>{journey.current_stage}</h3>
+        </div>
+        <div className="status-cluster">
+          {journey.dispatch_status ? <span className={`badge ${badgeTone(journey.dispatch_status)}`}>{journey.dispatch_status}</span> : null}
+          {journey.rider ? <ContactAction label={journey.rider.display_name} mobileNo={journey.rider.mobile_no} /> : null}
+        </div>
+      </div>
+      <ol className="journey-flow">
+        {journey.steps.map((step) => (
+          <li key={step.label} className={`journey-step is-${step.status.toLowerCase().replaceAll('_', '-')}`}>
+            <span className={`journey-dot ${badgeTone(step.status)}`} aria-hidden="true" />
+            <strong>{step.label}</strong>
+            <small>{formatDateTime(step.timestamp)}</small>
+            <span className="sr-only">{step.status}</span>
+          </li>
+        ))}
+      </ol>
+    </section>
+  )
+}
+
 function App() {
   const [session, setSession] = useState<AdminSession | null>(() => readSession())
   const [activeTab, setActiveTab] = useState<ViewTab>(() => {
     const stored = readActiveTab()
-    if (stored === 'overview' || stored === 'catalog' || stored === 'orders' || stored === 'riders' || stored === 'payouts' || stored === 'referrals' || stored === 'dispatch' || stored === 'errors' || stored === 'security') {
+    if (stored === 'overview' || stored === 'catalog' || stored === 'orders' || stored === 'history' || stored === 'riders' || stored === 'payouts' || stored === 'referrals' || stored === 'dispatch' || stored === 'errors' || stored === 'security') {
       return stored
     }
     return 'overview'
   })
   const [loginMode, setLoginMode] = useState<LoginMode>('google')
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null)
+  const [orderHistory, setOrderHistory] = useState<AdminOrderHistory | null>(null)
   const [catalogMerchants, setCatalogMerchants] = useState<AdminMerchantProfile[]>([])
   const [catalogAssignments, setCatalogAssignments] = useState<AdminProductMerchantAssignment[]>([])
   const [catalogProduct, setCatalogProduct] = useState<CatalogProductDraft>(EMPTY_CATALOG_PRODUCT)
@@ -189,6 +246,7 @@ function App() {
   const [otpHint, setOtpHint] = useState<string | null>(null)
   const [orderQuery, setOrderQuery] = useState('')
   const [zoneFilter, setZoneFilter] = useState('')
+  const [historyDays, setHistoryDays] = useState(30)
   const [ordersPage, setOrdersPage] = useState(1)
   const [payoutQuery, setPayoutQuery] = useState('')
   const [payoutPage, setPayoutPage] = useState(1)
@@ -218,6 +276,7 @@ function App() {
 
   const zoneOptions = dashboard?.zone_summary ?? []
   const liveRiders = riders?.items.filter((rider) => rider.latitude !== null && rider.longitude !== null) ?? []
+  const historyMaxOrders = Math.max(1, ...(orderHistory?.daily.map((day) => day.completed_orders) ?? [0]))
 
   async function handleAuthSuccess(nextSession: AdminSession) {
     writeSession(nextSession)
@@ -281,9 +340,20 @@ function App() {
     if (!session) {
       return
     }
-    const payload = await getDashboard(session.access_token)
+    const payload = await getDashboard(session.access_token, { zoneCode: zoneFilter || undefined })
     setDashboard(payload)
-  }, [session])
+  }, [session, zoneFilter])
+
+  const loadOrderHistory = useCallback(async () => {
+    if (!session) {
+      return
+    }
+    const payload = await getOrderHistory(session.access_token, {
+      zoneCode: zoneFilter || undefined,
+      days: historyDays,
+    })
+    setOrderHistory(payload)
+  }, [historyDays, session, zoneFilter])
 
   const loadOrders = useCallback(async () => {
     if (!session) {
@@ -402,6 +472,9 @@ function App() {
         await loadOrders()
         await loadSelectedOrder()
       }
+      if (activeTab === 'history') {
+        await loadOrderHistory()
+      }
       if (activeTab === 'riders') {
         await loadRiders()
       }
@@ -420,6 +493,7 @@ function App() {
     loadCatalogSetup,
     loadOrders,
     loadOverview,
+    loadOrderHistory,
     loadPayouts,
     loadReferralAdmin,
     loadRiders,
@@ -718,6 +792,7 @@ function App() {
     clearSession()
     setSession(null)
     setDashboard(null)
+    setOrderHistory(null)
     setCatalogMerchants([])
     setCatalogAssignments([])
     setCatalogProduct(EMPTY_CATALOG_PRODUCT)
@@ -842,6 +917,7 @@ function App() {
             ['overview', 'Overview'],
             ['catalog', 'Catalog'],
             ['orders', 'Orders'],
+            ['history', 'History'],
             ['riders', 'Riders'],
             ['payouts', 'Payouts'],
             ['referrals', 'Referrals'],
@@ -877,6 +953,7 @@ function App() {
               {activeTab === 'overview' && 'Control tower overview'}
               {activeTab === 'catalog' && 'Catalog and merchant setup'}
               {activeTab === 'orders' && 'Order search and intervention'}
+              {activeTab === 'history' && 'Completed order history'}
               {activeTab === 'riders' && 'Rider live operations'}
               {activeTab === 'payouts' && 'Merchant payout desk'}
               {activeTab === 'referrals' && 'Referral campaign desk'}
@@ -886,6 +963,30 @@ function App() {
             </h1>
           </div>
           <div className="topbar-actions">
+            {activeTab === 'overview' || activeTab === 'orders' || activeTab === 'history' ? (
+              <label className="area-selector">
+                <span>Area</span>
+                <select
+                  value={zoneFilter}
+                  onChange={(event) => {
+                    setOrdersPage(1)
+                    setZoneFilter(event.target.value)
+                  }}
+                >
+                  <option value="">All polygons</option>
+                  {zoneOptions.map((zone) => (
+                    <option key={zone.zone_code ?? zone.zone_name ?? 'zone'} value={zone.zone_code ?? ''}>
+                      {zone.zone_name ?? zone.zone_code ?? 'Unknown polygon'}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            {dashboard?.generated_at && (activeTab === 'overview' || activeTab === 'orders' || activeTab === 'history') ? (
+              <span className="live-indicator" title={`Last updated ${formatDateTime(dashboard.generated_at)}`}>
+                Live {formatDateTime(dashboard.generated_at)}
+              </span>
+            ) : null}
             {activeTab !== 'errors' && activeTab !== 'security' && activeTab !== 'dispatch' ? (
               <button className="ghost-button" onClick={() => void refreshActiveView()}>
                 Refresh
@@ -899,6 +1000,7 @@ function App() {
         {activeTab === 'overview' ? (
           <section className="overview-grid">
             <div className="stats-grid">
+              <StatCard label="Orders Today" value={String(dashboard?.orders_today ?? 0)} tone="positive" />
               <StatCard label="Active Orders" value={String(dashboard?.active_orders ?? 0)} tone="warning" />
               <StatCard label="Ready For Pickup" value={String(dashboard?.ready_for_pickup ?? 0)} tone="warning" />
               <StatCard label="In Transit" value={String(dashboard?.in_transit ?? 0)} tone="neutral" />
@@ -928,6 +1030,7 @@ function App() {
                     <span>{zone.zone_code ?? 'No zone code'}</span>
                     <div className="zone-metrics">
                       <MetricChip label="Active" value={String(zone.active_orders)} />
+                      <MetricChip label="Today" value={String(zone.orders_today)} />
                       <MetricChip label="Completed" value={String(zone.completed_today)} />
                       <MetricChip label="Riders" value={String(zone.online_riders)} />
                     </div>
@@ -1003,6 +1106,90 @@ function App() {
                   </tbody>
                 </table>
               </div>
+            </section>
+          </section>
+        ) : null}
+
+        {activeTab === 'history' ? (
+          <section className="history-layout">
+            <div className="history-toolbar">
+              <div>
+                <p className="section-kicker">Completed orders</p>
+                <h2>{zoneFilter ? 'Selected polygon history' : 'All polygon history'}</h2>
+              </div>
+              <label>
+                Period
+                <select value={historyDays} onChange={(event) => setHistoryDays(Number(event.target.value))}>
+                  <option value={7}>Last 7 days</option>
+                  <option value={30}>Last 30 days</option>
+                  <option value={90}>Last 90 days</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="stats-grid history-stats-grid">
+              <StatCard label="Completed" value={String(orderHistory?.completed_orders ?? 0)} tone="positive" />
+              <StatCard label="Completed Today" value={String(orderHistory?.completed_today ?? 0)} tone="positive" />
+              <StatCard label="Collected" value={formatMoney(orderHistory?.gross_revenue)} tone="neutral" />
+              <StatCard label="Average Order" value={formatMoney(orderHistory?.average_order_value)} tone="neutral" />
+              <StatCard label="Average Fulfillment" value={orderHistory?.average_fulfillment_minutes === null || orderHistory?.average_fulfillment_minutes === undefined ? 'Not available' : `${orderHistory.average_fulfillment_minutes} min`} tone="warning" />
+            </div>
+
+            <section className="panel">
+              <div className="panel-head">
+                <div>
+                  <p className="section-kicker">Daily completion</p>
+                  <h2>Delivery performance over {orderHistory?.period_days ?? historyDays} days</h2>
+                </div>
+              </div>
+              <div className="history-chart" aria-label="Completed orders by day">
+                {(orderHistory?.daily ?? []).map((day) => (
+                  <div className="history-bar-column" key={day.date} title={`${day.date}: ${day.completed_orders} completed orders`}>
+                    <strong>{day.completed_orders}</strong>
+                    <div className="history-bar-track">
+                      <div className="history-bar" style={{ height: `${Math.max(5, Math.round((day.completed_orders / historyMaxOrders) * 100))}%` }} />
+                    </div>
+                    <span>{new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short' }).format(new Date(`${day.date}T00:00:00`))}</span>
+                  </div>
+                ))}
+              </div>
+              {orderHistory?.daily.every((day) => day.completed_orders === 0) ? <EmptyState title="No completed orders yet" body="Completed delivery trends will appear here as orders are fulfilled." /> : null}
+            </section>
+
+            <section className="panel">
+              <div className="panel-head">
+                <div>
+                  <p className="section-kicker">History queue</p>
+                  <h2>Most recently completed orders</h2>
+                </div>
+              </div>
+              <div className="table-wrap">
+                <table className="ops-table">
+                  <thead>
+                    <tr>
+                      <th>Order</th>
+                      <th>Completed</th>
+                      <th>Polygon</th>
+                      <th>Merchants</th>
+                      <th>Rider</th>
+                      <th>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(orderHistory?.recent_completed_orders ?? []).map((item) => (
+                      <tr key={item.order_no} onClick={() => openOrder(item)}>
+                        <td><strong>#{item.order_no}</strong><span>{item.customer_name ?? 'Guest'}</span></td>
+                        <td>{formatDateTime(item.completed_at)}</td>
+                        <td>{item.service_zone_name ?? item.service_zone_code ?? 'No polygon'}</td>
+                        <td>{item.merchant_names.join(', ') || 'Unassigned'}</td>
+                        <td>{item.rider_names.join(', ') || 'Not assigned'}</td>
+                        <td>{formatMoney(item.payment_amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {orderHistory?.recent_completed_orders.length === 0 ? <EmptyState title="No completed orders" body="Once an order is delivered, it will appear here with its fulfillment history." /> : null}
             </section>
           </section>
         ) : null}
@@ -1231,6 +1418,8 @@ function App() {
                     <DetailCard title="Placed On" body={formatDateTime(selectedOrder.order_placed_on)} meta={selectedOrder.issue_flags.length ? selectedOrder.issue_flags.map(formatRelativeStatus).join(' • ') : 'Healthy'} />
                   </div>
 
+                  <OrderJourney order={selectedOrder} />
+
                   <div className="fulfillment-stack">
                     {selectedOrder.fulfillment_groups.map((group) => (
                       <article key={group.wo_no} className="fulfillment-card">
@@ -1239,6 +1428,7 @@ function App() {
                             <p className="section-kicker">Fulfillment #{group.wo_no}</p>
                             <h3>{group.merchant?.display_name ?? 'Unassigned merchant'}</h3>
                             <p>{group.merchant?.location_label ?? 'No merchant location label'}</p>
+                            {group.merchant ? <ContactAction label={group.merchant.display_name} mobileNo={group.merchant.mobile_no} /> : null}
                           </div>
                           <div className="status-cluster">
                             <span className={`badge ${badgeTone(group.order_status)}`}>{group.order_status}</span>
@@ -1250,6 +1440,7 @@ function App() {
                           <span>Subtotal {formatMoney(group.subtotal_amount)}</span>
                           <span>Prep {group.estimated_prep_minutes ? `${group.estimated_prep_minutes} min` : 'Not set'}</span>
                           <span>{group.rider?.display_name ?? 'No rider assigned yet'}</span>
+                          {group.rider ? <ContactAction label={group.rider.display_name} mobileNo={group.rider.mobile_no} /> : null}
                         </div>
 
                         {group.rider && group.rider.latitude !== null && group.rider.longitude !== null ? (
