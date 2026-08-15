@@ -148,6 +148,41 @@ export type AdminRiderListResult = {
   items: AdminRiderListItem[]
 }
 
+export type AdminMerchantProfile = {
+  merchant_uid: number
+  user_id: number
+  display_name: string
+  email_address: string | null
+  mobile_no: string | null
+  pickup_group_code: string | null
+  kitchen_type: string
+  status_cd: string
+  availability_status: string
+  effective_availability_status: string
+  pause_active: boolean
+  pause_scheduled: boolean
+  pause_start_at: string | null
+  pause_end_at: string | null
+  default_prep_minutes: number
+  location_label: string | null
+  coverage_zone_codes: string[]
+}
+
+export type AdminCatalogProduct = {
+  ProductCode: string
+  ProductDescription: string | null
+  ProductType: string
+  ImageUrl: string
+}
+
+export type AdminProductMerchantAssignment = {
+  product_code: string
+  merchant_uid: number
+  merchant_name: string
+  prep_time_minutes: number
+  active_yn: string
+}
+
 export type AdminMerchantPayoutSummary = {
   merchant_uid: number
   merchant_name: string
@@ -316,4 +351,30 @@ export type OperationalEventResult = {
   page: number
   pageSize: number
   items: OperationalEvent[]
+}
+
+export type DispatchIncident = {
+  id: number
+  delivery_task_id: number
+  parent_wo_no: number
+  service_zone_code: string | null
+  task_status: string
+  rider_uid: number | null
+  incident_type: string
+  severity: string
+  status_cd: string
+  title: string
+  details: Record<string, unknown> | null
+  first_detected_at: string
+  last_detected_at: string
+  last_notified_at: string | null
+  acknowledged_at: string | null
+  resolved_at: string | null
+}
+
+export type DispatchIncidentResult = {
+  total: number
+  page: number
+  pageSize: number
+  items: DispatchIncident[]
 }

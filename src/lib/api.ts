@@ -1,5 +1,9 @@
 import type {
   AdminDashboard,
+  AdminCatalogProduct,
+  DispatchIncident,
+  DispatchIncidentResult,
+  AdminMerchantProfile,
   AdminMerchantPayoutDetail,
   AdminMerchantPayoutSummaryResult,
   AdminOrderDetail,
@@ -11,6 +15,7 @@ import type {
   AdminReferralListResult,
   AdminRiderListResult,
   AdminSession,
+  AdminProductMerchantAssignment,
   AdminWalletCreditResponse,
 } from './types'
 
@@ -325,6 +330,70 @@ export async function getDashboard(token: string): Promise<AdminDashboard> {
   return request<AdminDashboard>('/admin/dashboard', { token })
 }
 
+export async function getProvisionedMerchants(token: string): Promise<AdminMerchantProfile[]> {
+  return request<AdminMerchantProfile[]>('/admin/merchants', { token })
+}
+
+export async function getProductMerchantAssignments(
+  token: string,
+): Promise<AdminProductMerchantAssignment[]> {
+  return request<AdminProductMerchantAssignment[]>('/admin/merchants/products/assignments', { token })
+}
+
+export async function createCatalogProduct(
+  token: string,
+  payload: {
+    productCode: string
+    productName: string
+    categoryName: string
+    price: string
+    imageUrl?: string
+    description?: string
+  },
+): Promise<AdminCatalogProduct> {
+  return request<AdminCatalogProduct>('/admin/catalog/products', {
+    method: 'POST',
+    token,
+    body: {
+      product_code: payload.productCode,
+      product_type_cd: 'PRODUCT',
+      product_des: payload.productName,
+      category_des: payload.categoryName,
+      information_1: payload.description || undefined,
+      charge_definition: [
+        {
+          charge_type_cd: 'ONETIME',
+          charge_ver: 1,
+          charge_amount: payload.price,
+        },
+      ],
+      product_images: payload.imageUrl
+        ? [{ url: payload.imageUrl, category_description: 'IMAGE' }]
+        : [],
+      product_labels: [],
+    },
+  })
+}
+
+export async function assignProductToMerchant(
+  token: string,
+  productCode: string,
+  payload: { merchantUid: number; prepTimeMinutes: number; activeYn?: 'Y' | 'N' },
+): Promise<AdminProductMerchantAssignment> {
+  return request<AdminProductMerchantAssignment>(
+    `/admin/merchants/products/${encodeURIComponent(productCode.toUpperCase())}`,
+    {
+      method: 'PUT',
+      token,
+      body: {
+        merchant_uid: payload.merchantUid,
+        prep_time_minutes: payload.prepTimeMinutes,
+        active_yn: payload.activeYn ?? 'Y',
+      },
+    },
+  )
+}
+
 export async function searchOrders(
   token: string,
   query: {
@@ -497,5 +566,19 @@ export async function getOperationalEvents(
   return request<OperationalEventResult>('/admin/observability/events', {
     token,
     query,
+  })
+}
+
+export async function getDispatchIncidents(
+  token: string,
+  query: { page?: number; pageSize?: number; status?: string } = {},
+): Promise<DispatchIncidentResult> {
+  return request<DispatchIncidentResult>('/admin/dispatch/incidents', { token, query })
+}
+
+export async function acknowledgeDispatchIncident(token: string, incidentId: number): Promise<DispatchIncident> {
+  return request<DispatchIncident>(`/admin/dispatch/incidents/${incidentId}/acknowledge`, {
+    method: 'POST',
+    token,
   })
 }

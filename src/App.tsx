@@ -1,14 +1,19 @@
 import { startTransition, useCallback, useDeferredValue, useEffect, useEffectEvent, useRef, useState } from 'react'
 import './App.css'
 import ObservabilityView from './features/observability/ObservabilityView'
+import DispatchView from './features/dispatch/DispatchView'
 import {
   ApiError,
+  assignProductToMerchant,
   appConfig,
+  createCatalogProduct,
   creditReferralWallet,
   getDashboard,
   getMerchantPayoutDetail,
   getMerchantPayouts,
   getOrderDetail,
+  getProductMerchantAssignments,
+  getProvisionedMerchants,
   getReferralAnalytics,
   getReferralConfig,
   getReferralList,
@@ -26,6 +31,7 @@ import {
 import { clearSession, readActiveTab, readSession, writeActiveTab, writeSession } from './lib/storage'
 import type {
   AdminDashboard,
+  AdminMerchantProfile,
   AdminMerchantPayoutDetail,
   AdminMerchantPayoutSummary,
   AdminMerchantPayoutSummaryResult,
@@ -37,11 +43,30 @@ import type {
   AdminReferralListResult,
   AdminRiderListResult,
   AdminSession,
+  AdminProductMerchantAssignment,
   AdminWalletCreditResponse,
 } from './lib/types'
 
-type ViewTab = 'overview' | 'orders' | 'riders' | 'payouts' | 'referrals' | 'errors' | 'security'
+type ViewTab = 'overview' | 'catalog' | 'orders' | 'riders' | 'payouts' | 'referrals' | 'dispatch' | 'errors' | 'security'
 type LoginMode = 'google' | 'otp'
+
+type CatalogProductDraft = {
+  productCode: string
+  productName: string
+  categoryName: string
+  price: string
+  imageUrl: string
+  description: string
+}
+
+const EMPTY_CATALOG_PRODUCT: CatalogProductDraft = {
+  productCode: '',
+  productName: '',
+  categoryName: '',
+  price: '',
+  imageUrl: '',
+  description: '',
+}
 
 const ORDER_ACTIONS = ['ACCEPTED', 'PREPARING', 'READY', 'ASSIGNED', 'IN_TRANSIT', 'COMPLETED'] as const
 
@@ -132,13 +157,20 @@ function App() {
   const [session, setSession] = useState<AdminSession | null>(() => readSession())
   const [activeTab, setActiveTab] = useState<ViewTab>(() => {
     const stored = readActiveTab()
-    if (stored === 'overview' || stored === 'orders' || stored === 'riders' || stored === 'payouts' || stored === 'referrals' || stored === 'errors' || stored === 'security') {
+    if (stored === 'overview' || stored === 'catalog' || stored === 'orders' || stored === 'riders' || stored === 'payouts' || stored === 'referrals' || stored === 'dispatch' || stored === 'errors' || stored === 'security') {
       return stored
     }
     return 'overview'
   })
   const [loginMode, setLoginMode] = useState<LoginMode>('google')
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null)
+  const [catalogMerchants, setCatalogMerchants] = useState<AdminMerchantProfile[]>([])
+  const [catalogAssignments, setCatalogAssignments] = useState<AdminProductMerchantAssignment[]>([])
+  const [catalogProduct, setCatalogProduct] = useState<CatalogProductDraft>(EMPTY_CATALOG_PRODUCT)
+  const [assignmentProductCode, setAssignmentProductCode] = useState('')
+  const [assignmentMerchantUid, setAssignmentMerchantUid] = useState('')
+  const [assignmentPrepMinutes, setAssignmentPrepMinutes] = useState('15')
+  const [catalogResult, setCatalogResult] = useState<string | null>(null)
   const [orders, setOrders] = useState<AdminOrderSearchResult | null>(null)
   const [selectedOrderNo, setSelectedOrderNo] = useState<number | null>(null)
   const [selectedOrder, setSelectedOrder] = useState<AdminOrderDetail | null>(null)
@@ -275,6 +307,19 @@ function App() {
     }
   }, [deferredOrderQuery, ordersPage, session, zoneFilter])
 
+  const loadCatalogSetup = useCallback(async () => {
+    if (!session) {
+      return
+    }
+    const [merchants, assignments] = await Promise.all([
+      getProvisionedMerchants(session.access_token),
+      getProductMerchantAssignments(session.access_token),
+    ])
+    setCatalogMerchants(merchants)
+    setCatalogAssignments(assignments)
+    setAssignmentMerchantUid((current) => current || String(merchants[0]?.merchant_uid ?? ''))
+  }, [session])
+
   const loadSelectedOrder = useCallback(async () => {
     if (!session || selectedOrderNo === null) {
       return
@@ -344,12 +389,15 @@ function App() {
     if (!session) {
       return
     }
-    if (activeTab === 'errors' || activeTab === 'security') {
+    if (activeTab === 'errors' || activeTab === 'security' || activeTab === 'dispatch') {
       return
     }
     setLastError(null)
     try {
       await loadOverview()
+      if (activeTab === 'catalog') {
+        await loadCatalogSetup()
+      }
       if (activeTab === 'orders') {
         await loadOrders()
         await loadSelectedOrder()
@@ -369,6 +417,7 @@ function App() {
     }
   }, [
     activeTab,
+    loadCatalogSetup,
     loadOrders,
     loadOverview,
     loadPayouts,
@@ -383,7 +432,7 @@ function App() {
     if (session) {
       void refreshActiveView()
     }
-  }, [refreshActiveView, session])
+  }, [activeTab, refreshActiveView, session])
 
   useEffect(() => {
     if (!session || activeTab !== 'orders' || selectedOrderNo === null) {
@@ -400,14 +449,77 @@ function App() {
   }, [session, activeTab, selectedMerchantUid, loadSelectedPayout])
 
   useEffect(() => {
-    if (!session) {
+    if (!session || activeTab === 'catalog') {
       return
     }
     const intervalId = window.setInterval(() => {
       void refreshActiveView()
     }, appConfig.dashboardPollIntervalMs)
     return () => window.clearInterval(intervalId)
-  }, [refreshActiveView, session])
+  }, [activeTab, refreshActiveView, session])
+
+  async function handleCreateCatalogProduct() {
+    if (!session) {
+      return
+    }
+    const productCode = catalogProduct.productCode.trim().toUpperCase()
+    const productName = catalogProduct.productName.trim()
+    const categoryName = catalogProduct.categoryName.trim()
+    const price = Number.parseFloat(catalogProduct.price)
+    if (!productCode || !productName || !categoryName || !Number.isFinite(price) || price <= 0) {
+      setLastError('Product code, name, category, and a positive price are required.')
+      return
+    }
+    setLoadingKey('catalog-product')
+    setLastError(null)
+    setCatalogResult(null)
+    try {
+      const created = await createCatalogProduct(session.access_token, {
+        productCode,
+        productName,
+        categoryName,
+        price: price.toFixed(2),
+        imageUrl: catalogProduct.imageUrl.trim() || undefined,
+        description: catalogProduct.description.trim() || undefined,
+      })
+      setAssignmentProductCode(created.ProductCode)
+      setCatalogProduct(EMPTY_CATALOG_PRODUCT)
+      setCatalogResult(`${created.ProductCode} created. Assign it to a merchant to publish it in covered zones.`)
+    } catch (error) {
+      setLastError(getErrorMessage(error))
+    } finally {
+      setLoadingKey(null)
+    }
+  }
+
+  async function handleAssignProduct() {
+    if (!session) {
+      return
+    }
+    const productCode = assignmentProductCode.trim().toUpperCase()
+    const merchantUid = Number.parseInt(assignmentMerchantUid, 10)
+    const prepTimeMinutes = Number.parseInt(assignmentPrepMinutes, 10)
+    if (!productCode || !Number.isFinite(merchantUid) || !Number.isFinite(prepTimeMinutes) || prepTimeMinutes < 1 || prepTimeMinutes > 180) {
+      setLastError('Product code, merchant, and prep time from 1 to 180 minutes are required.')
+      return
+    }
+    setLoadingKey('catalog-assignment')
+    setLastError(null)
+    setCatalogResult(null)
+    try {
+      const assignment = await assignProductToMerchant(session.access_token, productCode, {
+        merchantUid,
+        prepTimeMinutes,
+      })
+      await loadCatalogSetup()
+      setCatalogResult(`${assignment.product_code} is active for ${assignment.merchant_name}.`)
+      setAssignmentProductCode('')
+    } catch (error) {
+      setLastError(getErrorMessage(error))
+    } finally {
+      setLoadingKey(null)
+    }
+  }
 
   useEffect(() => {
     if (appConfig.googleClientId && window.google?.accounts?.id) {
@@ -606,6 +718,12 @@ function App() {
     clearSession()
     setSession(null)
     setDashboard(null)
+    setCatalogMerchants([])
+    setCatalogAssignments([])
+    setCatalogProduct(EMPTY_CATALOG_PRODUCT)
+    setAssignmentProductCode('')
+    setAssignmentMerchantUid('')
+    setCatalogResult(null)
     setOrders(null)
     setSelectedOrder(null)
     setSelectedOrderNo(null)
@@ -722,10 +840,12 @@ function App() {
         <nav className="sidebar-nav">
           {[
             ['overview', 'Overview'],
+            ['catalog', 'Catalog'],
             ['orders', 'Orders'],
             ['riders', 'Riders'],
             ['payouts', 'Payouts'],
             ['referrals', 'Referrals'],
+            ['dispatch', 'Dispatch'],
             ['errors', 'Errors'],
             ['security', 'Security'],
           ].map(([tab, label]) => (
@@ -755,16 +875,18 @@ function App() {
             <p className="eyebrow">Operations Control</p>
             <h1>
               {activeTab === 'overview' && 'Control tower overview'}
+              {activeTab === 'catalog' && 'Catalog and merchant setup'}
               {activeTab === 'orders' && 'Order search and intervention'}
               {activeTab === 'riders' && 'Rider live operations'}
               {activeTab === 'payouts' && 'Merchant payout desk'}
               {activeTab === 'referrals' && 'Referral campaign desk'}
+              {activeTab === 'dispatch' && 'Delivery dispatch watch'}
               {activeTab === 'errors' && 'Application error ledger'}
               {activeTab === 'security' && 'Security and login activity'}
             </h1>
           </div>
           <div className="topbar-actions">
-            {activeTab !== 'errors' && activeTab !== 'security' ? (
+            {activeTab !== 'errors' && activeTab !== 'security' && activeTab !== 'dispatch' ? (
               <button className="ghost-button" onClick={() => void refreshActiveView()}>
                 Refresh
               </button>
@@ -891,6 +1013,121 @@ function App() {
 
         {activeTab === 'security' ? (
           <ObservabilityView mode="security" token={session.access_token} />
+        ) : null}
+
+        {activeTab === 'dispatch' ? (
+          <DispatchView token={session.access_token} />
+        ) : null}
+
+        {activeTab === 'catalog' ? (
+          <section className="catalog-setup-grid">
+            <section className="panel">
+              <div className="panel-head compact">
+                <div>
+                  <p className="section-kicker">Product</p>
+                  <h2>Create a sellable catalog item</h2>
+                </div>
+              </div>
+              <form className="catalog-form" onSubmit={(event) => { event.preventDefault(); void handleCreateCatalogProduct() }}>
+                <div className="inline-grid">
+                  <label>
+                    Product code
+                    <input value={catalogProduct.productCode} onChange={(event) => setCatalogProduct((current) => ({ ...current, productCode: event.target.value.toUpperCase() }))} placeholder="PGRMEAL01" maxLength={40} />
+                  </label>
+                  <label>
+                    Price
+                    <input value={catalogProduct.price} onChange={(event) => setCatalogProduct((current) => ({ ...current, price: event.target.value }))} type="number" min="0.01" step="0.01" placeholder="149.00" />
+                  </label>
+                </div>
+                <label>
+                  Product name
+                  <input value={catalogProduct.productName} onChange={(event) => setCatalogProduct((current) => ({ ...current, productName: event.target.value }))} placeholder="Paneer rice bowl" maxLength={160} />
+                </label>
+                <label>
+                  Category
+                  <input value={catalogProduct.categoryName} onChange={(event) => setCatalogProduct((current) => ({ ...current, categoryName: event.target.value }))} placeholder="Rice bowls" maxLength={120} />
+                </label>
+                <label>
+                  Image URL
+                  <input value={catalogProduct.imageUrl} onChange={(event) => setCatalogProduct((current) => ({ ...current, imageUrl: event.target.value }))} type="url" placeholder="https://..." />
+                </label>
+                <label>
+                  Description
+                  <textarea value={catalogProduct.description} onChange={(event) => setCatalogProduct((current) => ({ ...current, description: event.target.value }))} rows={3} placeholder="Ingredients, portion, and customer-facing details" />
+                </label>
+                <button className="primary-button" type="submit" disabled={loadingKey === 'catalog-product'}>
+                  {loadingKey === 'catalog-product' ? 'Creating...' : 'Create product'}
+                </button>
+              </form>
+            </section>
+
+            <section className="panel">
+              <div className="panel-head compact">
+                <div>
+                  <p className="section-kicker">Availability</p>
+                  <h2>Assign a product to a merchant</h2>
+                </div>
+              </div>
+              <form className="catalog-form" onSubmit={(event) => { event.preventDefault(); void handleAssignProduct() }}>
+                <label>
+                  Product code
+                  <input value={assignmentProductCode} onChange={(event) => setAssignmentProductCode(event.target.value.toUpperCase())} placeholder="PGRMEAL01" maxLength={40} />
+                </label>
+                <label>
+                  Merchant
+                  <select value={assignmentMerchantUid} onChange={(event) => setAssignmentMerchantUid(event.target.value)}>
+                    <option value="">Select merchant</option>
+                    {catalogMerchants.map((merchant) => (
+                      <option key={merchant.merchant_uid} value={merchant.merchant_uid}>
+                        {merchant.display_name} · {merchant.location_label ?? merchant.kitchen_type} · {merchant.coverage_zone_codes.length > 0 ? merchant.coverage_zone_codes.join(', ') : 'NO COVERAGE'}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Preparation time (minutes)
+                  <input value={assignmentPrepMinutes} onChange={(event) => setAssignmentPrepMinutes(event.target.value)} type="number" min="1" max="180" />
+                </label>
+                <button className="primary-button" type="submit" disabled={loadingKey === 'catalog-assignment' || catalogMerchants.length === 0}>
+                  {loadingKey === 'catalog-assignment' ? 'Assigning...' : 'Assign and activate'}
+                </button>
+              </form>
+            </section>
+
+            {catalogResult ? <p className="success-banner">{catalogResult}</p> : null}
+
+            <section className="panel catalog-assignment-panel">
+              <div className="panel-head compact">
+                <div>
+                  <p className="section-kicker">Current Setup</p>
+                  <h2>Product-to-merchant assignments</h2>
+                </div>
+              </div>
+              <div className="table-wrap">
+                <table className="ops-table">
+                  <thead>
+                    <tr>
+                      <th>Product</th>
+                      <th>Merchant</th>
+                      <th>Prep time</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {catalogAssignments.map((assignment) => (
+                      <tr key={`${assignment.product_code}-${assignment.merchant_uid}`}>
+                        <td><strong>{assignment.product_code}</strong></td>
+                        <td>{assignment.merchant_name}</td>
+                        <td>{assignment.prep_time_minutes} minutes</td>
+                        <td><span className={`badge ${assignment.active_yn === 'Y' ? 'is-positive' : 'is-neutral'}`}>{assignment.active_yn === 'Y' ? 'ACTIVE' : 'PAUSED'}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {catalogAssignments.length === 0 ? <EmptyState title="No assignments" body="Create a product and assign it to an active merchant." /> : null}
+              </div>
+            </section>
+          </section>
         ) : null}
 
         {activeTab === 'orders' ? (
