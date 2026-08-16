@@ -25,8 +25,8 @@
 
 	route {
 		@googleAdminRedirect path /api/v1/admin/auth/google/redirect
-		reverse_proxy @googleAdminRedirect https://api.cravix.co.in {
-			header_up Host api.cravix.co.in
+		reverse_proxy @googleAdminRedirect https://easy-subscription-python-api-production.up.railway.app {
+			header_up Host easy-subscription-python-api-production.up.railway.app
 		}
 
 		try_files {path} /index.html
