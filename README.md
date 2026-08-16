@@ -21,7 +21,7 @@ The app defaults to the production Railway API. Create `.env.local` to use anoth
 
 ```text
 VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1
-VITE_GOOGLE_CLIENT_ID=
+VITE_GOOGLE_CLIENT_ID=your-local-or-alternate-web-client-id.apps.googleusercontent.com
 VITE_ALLOW_MOCK_GOOGLE=false
 VITE_APP_VERSION=local
 ```
@@ -52,7 +52,7 @@ Production output is written to `dist/`.
 
 ## Railway Deployment
 
-The checked-in `Dockerfile`, `Caddyfile`, and `railway.json` build and serve the PWA. Use `railway.variables.example.json` as the variable template. `VITE_*` values are embedded during the image build, so changing one requires a rebuild.
+The checked-in `Dockerfile`, `Caddyfile`, and `railway.json` build and serve the PWA. Use `railway.variables.example.json` as the variable template. The approved Cravix production Web OAuth client is built in as a fallback; `VITE_GOOGLE_CLIENT_ID` is only needed to override it. `VITE_*` values are embedded during the image build, so changing one requires a rebuild.
 
 The Caddy content-security policy permits the default production API and Google Identity domains. If `VITE_API_BASE_URL` moves to another origin, add that exact HTTPS origin to `connect-src` in `Caddyfile` before deployment.
 

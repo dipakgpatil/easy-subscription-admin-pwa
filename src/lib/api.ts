@@ -23,11 +23,12 @@ import type {
 } from './types'
 
 const DEFAULT_API_BASE_URL = 'https://easy-subscription-python-api-production.up.railway.app/api/v1'
+const DEFAULT_GOOGLE_CLIENT_ID = '448494748748-hiu2s00n0fkegd8p23n3g2tuaihqjfdi.apps.googleusercontent.com'
 const API_BASE_URL = ((import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '').trim() || DEFAULT_API_BASE_URL
 
 export const appConfig = {
   apiBaseUrl: API_BASE_URL,
-  googleClientId: ((import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) ?? '').trim(),
+  googleClientId: ((import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) ?? '').trim() || DEFAULT_GOOGLE_CLIENT_ID,
   allowMockGoogle: ((import.meta.env.VITE_ALLOW_MOCK_GOOGLE as string | undefined) ?? 'false').trim() === 'true',
   dashboardPollIntervalMs: 15000,
 }
