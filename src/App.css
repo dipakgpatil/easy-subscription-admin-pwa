@@ -582,6 +582,46 @@ label {
   margin-top: 1rem;
 }
 
+.administrator-view,
+.administrator-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.administrator-intro {
+  display: grid;
+  gap: 1rem;
+}
+
+.administrator-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.administrator-form-actions {
+  display: grid;
+  grid-template-columns: minmax(220px, 360px) auto;
+  gap: 1rem;
+  align-items: end;
+}
+
+.administrator-form-actions .primary-button {
+  width: fit-content;
+  min-height: 48px;
+}
+
+.administrator-message {
+  width: fit-content;
+}
+
+.administrator-table td:last-child {
+  white-space: nowrap;
+}
+
+.danger-button {
+  color: #8f2e15;
+  background: rgba(255, 90, 54, 0.1);
+}
+
 .catalog-assignment-panel,
 .catalog-setup-grid > .success-banner {
   grid-column: 1 / -1;

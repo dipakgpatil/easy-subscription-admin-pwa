@@ -17,6 +17,8 @@ import type {
   AdminRiderListResult,
   AdminSession,
   AdminProductMerchantAssignment,
+  AdminAdministrator,
+  AdminAdministratorResult,
   AdminWalletCreditResponse,
 } from './types'
 
@@ -249,7 +251,7 @@ function normalizeWalletCreditResponse(payload: Record<string, unknown>): AdminW
 }
 
 type RequestOptions = {
-  method?: 'GET' | 'POST' | 'PUT'
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
   token?: string
   body?: unknown
   query?: Record<string, string | number | undefined>
@@ -338,6 +340,28 @@ export async function verifyAdminOtp(mobileNo: string, otp: string): Promise<Adm
   return request<AdminSession>('/admin/auth/otp/verify', {
     method: 'POST',
     body: { mobile_no: mobileNo, otp },
+  })
+}
+
+export async function getAdministrators(token: string): Promise<AdminAdministratorResult> {
+  return request<AdminAdministratorResult>('/admin/administrators', { token })
+}
+
+export async function grantAdministrator(
+  token: string,
+  payload: { fullName: string; emailAddress: string; mobileNo?: string },
+): Promise<AdminAdministrator> {
+  return request<AdminAdministrator>('/admin/administrators', {
+    method: 'POST',
+    token,
+    body: payload,
+  })
+}
+
+export async function revokeAdministrator(token: string, userId: number): Promise<AdminAdministrator> {
+  return request<AdminAdministrator>(`/admin/administrators/${userId}`, {
+    method: 'DELETE',
+    token,
   })
 }
 

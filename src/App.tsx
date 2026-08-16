@@ -2,6 +2,7 @@ import { startTransition, useCallback, useDeferredValue, useEffect, useEffectEve
 import './App.css'
 import ObservabilityView from './features/observability/ObservabilityView'
 import DispatchView from './features/dispatch/DispatchView'
+import AdministratorsView from './features/administrators/AdministratorsView'
 import {
   ApiError,
   assignProductToMerchant,
@@ -49,7 +50,7 @@ import type {
   AdminWalletCreditResponse,
 } from './lib/types'
 
-type ViewTab = 'overview' | 'catalog' | 'orders' | 'history' | 'riders' | 'payouts' | 'referrals' | 'dispatch' | 'errors' | 'security'
+type ViewTab = 'overview' | 'catalog' | 'orders' | 'history' | 'riders' | 'payouts' | 'referrals' | 'dispatch' | 'errors' | 'security' | 'administrators'
 type LoginMode = 'google' | 'otp'
 
 type CatalogProductDraft = {
@@ -213,7 +214,7 @@ function App() {
   const [session, setSession] = useState<AdminSession | null>(() => readSession())
   const [activeTab, setActiveTab] = useState<ViewTab>(() => {
     const stored = readActiveTab()
-    if (stored === 'overview' || stored === 'catalog' || stored === 'orders' || stored === 'history' || stored === 'riders' || stored === 'payouts' || stored === 'referrals' || stored === 'dispatch' || stored === 'errors' || stored === 'security') {
+    if (stored === 'overview' || stored === 'catalog' || stored === 'orders' || stored === 'history' || stored === 'riders' || stored === 'payouts' || stored === 'referrals' || stored === 'dispatch' || stored === 'errors' || stored === 'security' || stored === 'administrators') {
       return stored
     }
     return 'overview'
@@ -459,7 +460,7 @@ function App() {
     if (!session) {
       return
     }
-    if (activeTab === 'errors' || activeTab === 'security' || activeTab === 'dispatch') {
+    if (activeTab === 'errors' || activeTab === 'security' || activeTab === 'dispatch' || activeTab === 'administrators') {
       return
     }
     setLastError(null)
@@ -924,6 +925,7 @@ function App() {
             ['dispatch', 'Dispatch'],
             ['errors', 'Errors'],
             ['security', 'Security'],
+            ['administrators', 'Administrators'],
           ].map(([tab, label]) => (
             <button
               key={tab}
@@ -960,6 +962,7 @@ function App() {
               {activeTab === 'dispatch' && 'Delivery dispatch watch'}
               {activeTab === 'errors' && 'Application error ledger'}
               {activeTab === 'security' && 'Security and login activity'}
+              {activeTab === 'administrators' && 'Administrator access'}
             </h1>
           </div>
           <div className="topbar-actions">
@@ -987,7 +990,7 @@ function App() {
                 Live {formatDateTime(dashboard.generated_at)}
               </span>
             ) : null}
-            {activeTab !== 'errors' && activeTab !== 'security' && activeTab !== 'dispatch' ? (
+            {activeTab !== 'errors' && activeTab !== 'security' && activeTab !== 'dispatch' && activeTab !== 'administrators' ? (
               <button className="ghost-button" onClick={() => void refreshActiveView()}>
                 Refresh
               </button>
@@ -1204,6 +1207,10 @@ function App() {
 
         {activeTab === 'dispatch' ? (
           <DispatchView token={session.access_token} />
+        ) : null}
+
+        {activeTab === 'administrators' ? (
+          <AdministratorsView token={session.access_token} />
         ) : null}
 
         {activeTab === 'catalog' ? (

@@ -10,6 +10,25 @@ export type AdminSession = {
   mobile_no: string | null
 }
 
+export type AdminAdministrator = {
+  user_id: number
+  display_name: string | null
+  email_address: string | null
+  mobile_no: string | null
+  status_cd: string | null
+  roles: string[]
+  entityAccess: string[]
+  googleLinked: boolean
+  isProtectedOwner: boolean
+  lastLoginDate: string | null
+  createdAt: string | null
+}
+
+export type AdminAdministratorResult = {
+  total: number
+  items: AdminAdministrator[]
+}
+
 export type AdminZoneSummary = {
   zone_code: string | null
   zone_name: string | null
