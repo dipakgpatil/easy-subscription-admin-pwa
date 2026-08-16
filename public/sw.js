@@ -1,5 +1,5 @@
-const SHELL_CACHE = 'cravix-admin-shell-v2'
-const RUNTIME_CACHE = 'cravix-admin-runtime-v2'
+const SHELL_CACHE = 'cravix-admin-shell-v3'
+const RUNTIME_CACHE = 'cravix-admin-runtime-v3'
 const SHELL_ASSETS = ['/', '/index.html', '/manifest.webmanifest', '/admin-icon.svg', '/admin-logo.svg']
 
 self.addEventListener('install', (event) => {
@@ -24,6 +24,22 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url)
   if (url.origin === self.location.origin) {
+    const isAppShell = event.request.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html'
+    if (isAppShell) {
+      event.respondWith(
+        fetch(event.request)
+          .then(async (response) => {
+            if (response.ok) {
+              const cache = await caches.open(RUNTIME_CACHE)
+              await cache.put(event.request, response.clone())
+            }
+            return response
+          })
+          .catch(async () => (await caches.match(event.request)) ?? Response.error()),
+      )
+      return
+    }
+
     event.respondWith(
       caches.match(event.request).then(async (cached) => {
         const cache = await caches.open(RUNTIME_CACHE)
