@@ -376,6 +376,7 @@ export type OperationalEvent = {
   app_version: string | null
   user_agent: string | null
   duration_ms: number | null
+  exception_blob: Record<string, unknown> | null
   integrity_valid: boolean
 }
 

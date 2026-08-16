@@ -78,6 +78,18 @@ function sanitizedClientMessage(error: unknown): string {
     .slice(0, 500)
 }
 
+function diagnosticBlob(error: unknown): Record<string, string> | undefined {
+  if (!(error instanceof Error)) return undefined
+  const stackTrace = error.stack
+    ?.replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .slice(0, 6000)
+  return {
+    error_name: error.name.slice(0, 120),
+    ...(stackTrace ? { stack_trace: stackTrace } : {}),
+  }
+}
+
 export async function reportAdminClientError(
   flow: string,
   error: unknown,
@@ -113,6 +125,8 @@ export async function reportAdminClientError(
         platform: 'WEB',
         app_version: String(import.meta.env.VITE_APP_VERSION ?? 'unknown'),
         installation_id: installationId(),
+        exception_type: error instanceof Error ? error.name.slice(0, 120) : undefined,
+        exception_blob: diagnosticBlob(error),
       }),
       signal: AbortSignal.timeout(5000),
     })

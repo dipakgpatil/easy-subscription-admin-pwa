@@ -87,6 +87,12 @@ function EventTable({ events }: { events: OperationalEvent[] }) {
                     <div><dt>Duration</dt><dd>{event.duration_ms === null ? 'Unknown' : `${event.duration_ms} ms`}</dd></div>
                     <div><dt>Integrity</dt><dd>{event.integrity_valid ? 'Verified' : 'Check failed'}</dd></div>
                   </dl>
+                  {event.exception_blob ? (
+                    <details className="event-diagnostic">
+                      <summary>Diagnostic payload</summary>
+                      <pre>{JSON.stringify(event.exception_blob, null, 2)}</pre>
+                    </details>
+                  ) : null}
                 </details>
               </td>
               <td>
