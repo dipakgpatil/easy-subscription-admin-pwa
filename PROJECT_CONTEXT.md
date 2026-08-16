@@ -74,3 +74,4 @@ Use `.env` or `.env.local` with `VITE_API_BASE_URL`, `VITE_GOOGLE_CLIENT_ID`, an
 - Mock Google fallback is development-only and disabled by default.
 - Keep observability pages manually refreshed; do not add high-frequency polling that creates load or audit noise.
 - Order alerts use a bearer-authenticated, fetch-backed Server-Sent Events reader. Do not replace it with native `EventSource` unless authentication moves to a secure same-origin cookie: `EventSource` cannot attach the session bearer header, and tokens must never be placed in a stream URL. The client reconnects with `Last-Event-ID`; its normal 15-second polling is the deliberate fallback.
+- A `401 Unauthorized` from a normal admin request or the realtime stream clears the tab-scoped session and returns the operator to sign-in. Never leave an expired token in browser storage or make the operator hunt for a logout control.

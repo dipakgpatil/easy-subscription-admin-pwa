@@ -545,6 +545,10 @@ function App() {
       }
       return true
     } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        handleLogout('Your session expired. Please sign in again.')
+        return false
+      }
       setLastError(getErrorMessage(error))
       return false
     }
@@ -580,6 +584,7 @@ function App() {
       token: session.access_token,
       zoneCode: zoneFilter || undefined,
       onStatusChange: setStreamStatus,
+      onAuthenticationExpired: () => handleLogout('Your session expired. Please sign in again.'),
       onOrderCreated: (event) => {
         if (announcedOrderNumbersRef.current.has(event.order_no)) return
         announcedOrderNumbersRef.current.add(event.order_no)
@@ -932,9 +937,10 @@ function App() {
     })
   }
 
-  function handleLogout() {
+  function handleLogout(message: string | null = null) {
     clearSession()
     setSession(null)
+    setLastError(message)
     setDashboard(null)
     setOrderHistory(null)
     setCatalogMerchants([])
@@ -1127,7 +1133,7 @@ function App() {
             <strong>{session.display_name ?? 'Cravix Admin'}</strong>
             <span>{session.email_address ?? session.mobile_no ?? 'Administrator'}</span>
           </div>
-          <button className="ghost-button sign-out-button" onClick={handleLogout} title="Sign out" aria-label="Sign out">
+          <button className="ghost-button sign-out-button" onClick={() => handleLogout()} title="Sign out" aria-label="Sign out">
             <LogOut className="sign-out-icon" aria-hidden="true" />
             <span className="nav-label">Sign out</span>
           </button>

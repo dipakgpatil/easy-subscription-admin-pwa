@@ -324,6 +324,7 @@ type AdminOrderStreamOptions = {
   zoneCode?: string
   onOrderCreated: (event: AdminOrderCreatedEvent) => void
   onStatusChange: (status: AdminOrderStreamStatus) => void
+  onAuthenticationExpired: () => void
 }
 
 function parseSseFrame(frame: string): { event: string; id: string | null; data: string } | null {
@@ -385,6 +386,11 @@ export function connectAdminOrderStream(options: AdminOrderStreamOptions): () =>
       signal: controller.signal,
     })
     if (!response.ok) {
+      if (response.status === 401) {
+        stopped = true
+        options.onAuthenticationExpired()
+        return
+      }
       throw new ApiError('Real-time order alerts are temporarily unavailable.', response.status, response.headers.get('x-request-id'))
     }
     if (!response.body) {
