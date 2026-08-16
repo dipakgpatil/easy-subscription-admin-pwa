@@ -66,6 +66,13 @@ export type AdminOrderSearchResult = {
   items: AdminOrderListItem[]
 }
 
+export type AdminOrderCreatedEvent = {
+  order_no: number
+  service_zone_code: string | null
+  service_zone_name: string | null
+  order_placed_on: string | null
+}
+
 export type AdminParty = {
   name: string | null
   mobile_no: string | null

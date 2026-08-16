@@ -1,6 +1,6 @@
 # Easy Subscription Admin PWA - Project Context
 
-Last refreshed: 2026-06-20
+Last refreshed: 2026-08-16
 
 Baseline before observability work: `ef2c4e4` - Add referral admin campaign tools
 Open PRs checked: none
@@ -40,6 +40,7 @@ The app defaults to `https://easy-subscription-python-api-production.up.railway.
 - `/admin/auth/otp/verify`
 - `/admin/dashboard`
 - `/admin/orders`
+- `/admin/orders/stream`
 - `/admin/orders/{woNo}`
 - `/admin/orders/{woNo}/status`
 - `/admin/riders` and `/admin/riders/live`
@@ -72,3 +73,4 @@ Use `.env` or `.env.local` with `VITE_API_BASE_URL`, `VITE_GOOGLE_CLIENT_ID`, an
 - When adding backend fields, update `src/lib/types.ts` and normalization helpers together.
 - Mock Google fallback is development-only and disabled by default.
 - Keep observability pages manually refreshed; do not add high-frequency polling that creates load or audit noise.
+- Order alerts use a bearer-authenticated, fetch-backed Server-Sent Events reader. Do not replace it with native `EventSource` unless authentication moves to a secure same-origin cookie: `EventSource` cannot attach the session bearer header, and tokens must never be placed in a stream URL. The client reconnects with `Last-Event-ID`; its normal 15-second polling is the deliberate fallback.

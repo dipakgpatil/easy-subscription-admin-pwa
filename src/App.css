@@ -377,6 +377,12 @@ label {
   color: white;
 }
 
+.sign-out-icon {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: 0 0 auto;
+}
+
 .workspace {
   min-width: 0;
   display: grid;
@@ -549,6 +555,123 @@ label {
   border-radius: 50%;
   background: var(--positive);
   box-shadow: 0 0 0 4px rgba(18, 166, 109, 0.12);
+}
+
+.stream-indicator,
+.manual-refresh-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.stream-indicator svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.stream-indicator.is-live {
+  color: #087348;
+}
+
+.stream-indicator.is-connecting,
+.stream-indicator.is-reconnecting {
+  color: #8a5b08;
+}
+
+.refresh-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.refresh-button svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.is-spinning {
+  animation: refresh-spin 800ms linear infinite;
+}
+
+.manual-refresh-status {
+  justify-self: end;
+  margin-top: -0.65rem;
+}
+
+.new-order-alert {
+  position: fixed;
+  z-index: 20;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 0.75rem;
+  align-items: center;
+  width: min(470px, calc(100vw - 2rem));
+  padding: 0.85rem 0.9rem;
+  border: 1px solid rgba(18, 166, 109, 0.3);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 16px 38px rgba(16, 39, 36, 0.2);
+}
+
+.new-order-alert > svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--positive);
+}
+
+.new-order-alert div {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.new-order-alert strong,
+.new-order-alert span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.new-order-alert span {
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+}
+
+.new-order-alert-open,
+.new-order-alert-dismiss {
+  border: 0;
+  background: transparent;
+  color: var(--forest);
+  font-weight: 800;
+}
+
+.new-order-alert-open {
+  padding: 0.45rem 0.6rem;
+  border-radius: 6px;
+  background: rgba(18, 166, 109, 0.12);
+  color: #087348;
+}
+
+.new-order-alert-dismiss {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.new-order-alert-dismiss:hover {
+  background: rgba(16, 39, 36, 0.08);
+}
+
+@keyframes refresh-spin {
+  to { transform: rotate(360deg); }
 }
 
 .panel {
@@ -1852,6 +1975,33 @@ label {
   background: rgba(197, 255, 0, 0.18);
   color: var(--lime);
   font-size: 0.72rem;
+}
+
+.sidebar-is-collapsed .sign-out-button {
+  position: relative;
+}
+
+.sidebar-is-collapsed .sign-out-button::after {
+  position: absolute;
+  left: calc(100% + 0.55rem);
+  z-index: 3;
+  padding: 0.4rem 0.55rem;
+  border-radius: 5px;
+  background: var(--forest);
+  color: #ffffff;
+  content: 'Sign out';
+  font-size: 0.75rem;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-0.25rem);
+  transition: opacity 120ms ease, transform 120ms ease;
+  white-space: nowrap;
+}
+
+.sidebar-is-collapsed .sign-out-button:hover::after,
+.sidebar-is-collapsed .sign-out-button:focus-visible::after {
+  opacity: 1;
+  transform: translateX(0);
 }
 
 .workspace {

@@ -8,6 +8,7 @@ import type {
   AdminMerchantPayoutDetail,
   AdminMerchantPayoutSummaryResult,
   AdminOrderDetail,
+  AdminOrderCreatedEvent,
   AdminOrderSearchResult,
   OperationalEventResult,
   ObservabilitySummary,
@@ -314,6 +315,136 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     throw error
   }
   return payload as T
+}
+
+type AdminOrderStreamStatus = 'connecting' | 'live' | 'reconnecting'
+
+type AdminOrderStreamOptions = {
+  token: string
+  zoneCode?: string
+  onOrderCreated: (event: AdminOrderCreatedEvent) => void
+  onStatusChange: (status: AdminOrderStreamStatus) => void
+}
+
+function parseSseFrame(frame: string): { event: string; id: string | null; data: string } | null {
+  let event = 'message'
+  let id: string | null = null
+  const data: string[] = []
+
+  for (const line of frame.split('\n')) {
+    if (!line || line.startsWith(':')) continue
+    const separator = line.indexOf(':')
+    const field = separator === -1 ? line : line.slice(0, separator)
+    const value = (separator === -1 ? '' : line.slice(separator + 1)).replace(/^ /, '')
+    if (field === 'event') event = value
+    if (field === 'id') id = value
+    if (field === 'data') data.push(value)
+  }
+
+  return data.length > 0 ? { event, id, data: data.join('\n') } : null
+}
+
+function normalizeNewOrderEvent(payload: unknown): AdminOrderCreatedEvent | null {
+  if (!payload || typeof payload !== 'object') return null
+  const record = payload as Record<string, unknown>
+  const orderNo = Number(record.order_no)
+  if (!Number.isSafeInteger(orderNo) || orderNo < 1) return null
+  return {
+    order_no: orderNo,
+    service_zone_code: typeof record.service_zone_code === 'string' ? record.service_zone_code : null,
+    service_zone_name: typeof record.service_zone_name === 'string' ? record.service_zone_name : null,
+    order_placed_on: typeof record.order_placed_on === 'string' ? record.order_placed_on : null,
+  }
+}
+
+/**
+ * Opens a bearer-authenticated SSE connection. Native EventSource cannot attach
+ * an Authorization header, so fetch keeps the token out of query strings and
+ * still consumes the standard text/event-stream protocol.
+ */
+export function connectAdminOrderStream(options: AdminOrderStreamOptions): () => void {
+  const controller = new AbortController()
+  let stopped = false
+  let lastEventId: string | null = null
+
+  const pause = (milliseconds: number) =>
+    new Promise<void>((resolve) => {
+      window.setTimeout(resolve, milliseconds)
+    })
+
+  const readConnection = async () => {
+    const url = new URL(`${API_BASE_URL}/admin/orders/stream`)
+    if (options.zoneCode) url.searchParams.set('zoneCode', options.zoneCode)
+    const response = await fetch(url.toString(), {
+      headers: {
+        Accept: 'text/event-stream',
+        Authorization: `Bearer ${options.token}`,
+        ...(lastEventId ? { 'Last-Event-ID': lastEventId } : {}),
+      },
+      credentials: 'omit',
+      signal: controller.signal,
+    })
+    if (!response.ok) {
+      throw new ApiError('Real-time order alerts are temporarily unavailable.', response.status, response.headers.get('x-request-id'))
+    }
+    if (!response.body) {
+      throw new ApiError('The real-time order stream did not start.', response.status, response.headers.get('x-request-id'))
+    }
+
+    options.onStatusChange('live')
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    try {
+      while (!stopped) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n')
+        let frameBoundary = buffer.indexOf('\n\n')
+        while (frameBoundary !== -1) {
+          const frame = parseSseFrame(buffer.slice(0, frameBoundary))
+          buffer = buffer.slice(frameBoundary + 2)
+          frameBoundary = buffer.indexOf('\n\n')
+          if (!frame) continue
+          if (frame.id) lastEventId = frame.id
+          if (frame.event !== 'order.created') continue
+          try {
+            const orderEvent = normalizeNewOrderEvent(JSON.parse(frame.data))
+            if (orderEvent) options.onOrderCreated(orderEvent)
+          } catch {
+            // A malformed realtime message is ignored; regular polling still reconciles orders.
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock()
+    }
+    if (!stopped) {
+      throw new Error('The real-time order stream ended.')
+    }
+  }
+
+  const run = async () => {
+    let reconnectDelayMs = 1_000
+    while (!stopped) {
+      options.onStatusChange(lastEventId ? 'reconnecting' : 'connecting')
+      try {
+        await readConnection()
+        reconnectDelayMs = 1_000
+      } catch {
+        if (stopped) return
+        options.onStatusChange('reconnecting')
+        await pause(reconnectDelayMs)
+        reconnectDelayMs = Math.min(reconnectDelayMs * 2, 15_000)
+      }
+    }
+  }
+
+  void run()
+  return () => {
+    stopped = true
+    controller.abort()
+  }
 }
 
 export async function loginAdminWithGoogleIdToken(idToken: string): Promise<AdminSession> {

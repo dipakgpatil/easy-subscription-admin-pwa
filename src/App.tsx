@@ -7,13 +7,19 @@ import {
   CircleDot,
   Clock3,
   CreditCard,
+  BellRing,
+  LogOut,
   MapPin,
   Package,
   PhoneCall,
+  RefreshCw,
   Route,
   ShoppingBag,
   Truck,
   UserRound,
+  Wifi,
+  WifiOff,
+  X,
 } from 'lucide-react'
 import './App.css'
 import ObservabilityView from './features/observability/ObservabilityView'
@@ -24,6 +30,7 @@ import {
   assignProductToMerchant,
   appConfig,
   completeAdminGoogleRedirectLogin,
+  connectAdminOrderStream,
   createCatalogProduct,
   creditReferralWallet,
   getDashboard,
@@ -63,6 +70,7 @@ import type {
   AdminMerchantPayoutSummary,
   AdminMerchantPayoutSummaryResult,
   AdminOrderDetail,
+  AdminOrderCreatedEvent,
   AdminOrderListItem,
   AdminOrderSearchResult,
   AdminReferralAnalytics,
@@ -325,9 +333,15 @@ function App() {
   const [walletCreditResult, setWalletCreditResult] = useState<AdminWalletCreditResponse | null>(null)
   const [assignmentDrafts, setAssignmentDrafts] = useState<Record<number, string>>({})
   const [loadingKey, setLoadingKey] = useState<string | null>(null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [lastManualRefreshAt, setLastManualRefreshAt] = useState<string | null>(null)
+  const [orderAlert, setOrderAlert] = useState<AdminOrderCreatedEvent | null>(null)
+  const [streamStatus, setStreamStatus] = useState<'connecting' | 'live' | 'reconnecting'>('connecting')
   const [lastError, setLastError] = useState<string | null>(null)
   const [googleScriptReady, setGoogleScriptReady] = useState(false)
   const googleButtonRef = useRef<HTMLDivElement | null>(null)
+  const refreshActiveViewRef = useRef<() => Promise<boolean>>(async () => false)
+  const announcedOrderNumbersRef = useRef(new Set<number>())
   const deferredOrderQuery = useDeferredValue(orderQuery)
   const deferredPayoutQuery = useDeferredValue(payoutQuery)
   const deferredReferralQuery = useDeferredValue(referralQuery)
@@ -498,12 +512,12 @@ function App() {
     setReferralList(listPayload)
   }, [deferredReferralQuery, referralPage, referralRewardStatus, referralStatus, session])
 
-  const refreshActiveView = useCallback(async () => {
+  const refreshActiveView = useCallback(async (): Promise<boolean> => {
     if (!session) {
-      return
+      return false
     }
     if (activeTab === 'errors' || activeTab === 'security' || activeTab === 'dispatch' || activeTab === 'administrators') {
-      return
+      return false
     }
     setLastError(null)
     try {
@@ -529,8 +543,10 @@ function App() {
       if (activeTab === 'referrals') {
         await loadReferralAdmin()
       }
+      return true
     } catch (error) {
       setLastError(getErrorMessage(error))
+      return false
     }
   }, [
     activeTab,
@@ -547,10 +563,44 @@ function App() {
   ])
 
   useEffect(() => {
+    refreshActiveViewRef.current = refreshActiveView
+  }, [refreshActiveView])
+
+  useEffect(() => {
     if (session) {
       void refreshActiveView()
     }
   }, [activeTab, refreshActiveView, session])
+
+  useEffect(() => {
+    if (!session) {
+      return
+    }
+    return connectAdminOrderStream({
+      token: session.access_token,
+      zoneCode: zoneFilter || undefined,
+      onStatusChange: setStreamStatus,
+      onOrderCreated: (event) => {
+        if (announcedOrderNumbersRef.current.has(event.order_no)) return
+        announcedOrderNumbersRef.current.add(event.order_no)
+        if (announcedOrderNumbersRef.current.size > 100) announcedOrderNumbersRef.current.clear()
+        setOrderAlert(event)
+        void refreshActiveViewRef.current()
+      },
+    })
+  }, [session, zoneFilter])
+
+  async function handleManualRefresh() {
+    if (isRefreshing) return
+    setIsRefreshing(true)
+    try {
+      if (await refreshActiveView()) {
+        setLastManualRefreshAt(new Date().toISOString())
+      }
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
 
   useEffect(() => {
     if (!session || activeTab !== 'orders' || selectedOrderNo === null) {
@@ -858,12 +908,16 @@ function App() {
     }
   }
 
-  function openOrder(item: AdminOrderListItem) {
+  function openOrderNo(orderNo: number) {
     startTransition(() => {
       setActiveTab('orders')
-      setSelectedOrderNo(item.order_no)
+      setSelectedOrderNo(orderNo)
       setSelectedOrder(null)
     })
+  }
+
+  function openOrder(item: AdminOrderListItem) {
+    openOrderNo(item.order_no)
   }
 
   function closeOrderContext() {
@@ -901,6 +955,7 @@ function App() {
     setReferralList(null)
     setReferralTestResult(null)
     setWalletCreditResult(null)
+    setOrderAlert(null)
   }
 
   const isGoogleRedirectCallback = window.location.pathname === '/auth/callback'
@@ -1072,8 +1127,8 @@ function App() {
             <strong>{session.display_name ?? 'Cravix Admin'}</strong>
             <span>{session.email_address ?? session.mobile_no ?? 'Administrator'}</span>
           </div>
-          <button className="ghost-button sign-out-button" onClick={handleLogout} title="Sign out">
-            <span className="nav-mark" aria-hidden="true">S</span>
+          <button className="ghost-button sign-out-button" onClick={handleLogout} title="Sign out" aria-label="Sign out">
+            <LogOut className="sign-out-icon" aria-hidden="true" />
             <span className="nav-label">Sign out</span>
           </button>
         </div>
@@ -1127,15 +1182,36 @@ function App() {
                 Live {formatDateTime(dashboard.generated_at)}
               </span>
             ) : null}
+            <span className={`stream-indicator is-${streamStatus}`} title="New orders are delivered through an authenticated live stream; automatic refresh remains enabled as a fallback.">
+              {streamStatus === 'live' ? <Wifi aria-hidden="true" /> : <WifiOff aria-hidden="true" />}
+              {streamStatus === 'live' ? 'Alerts live' : 'Reconnecting alerts'}
+            </span>
             {activeTab !== 'errors' && activeTab !== 'security' && activeTab !== 'dispatch' && activeTab !== 'administrators' ? (
-              <button className="ghost-button" onClick={() => void refreshActiveView()}>
-                Refresh
+              <button className="ghost-button refresh-button" onClick={() => void handleManualRefresh()} disabled={isRefreshing}>
+                <RefreshCw className={isRefreshing ? 'is-spinning' : undefined} aria-hidden="true" />
+                {isRefreshing ? 'Refreshing' : 'Refresh'}
               </button>
             ) : null}
           </div>
         </header>
 
         {lastError ? <p className="error-banner in-app">{lastError}</p> : null}
+        {lastManualRefreshAt ? <span className="manual-refresh-status" aria-live="polite">Updated {formatDateTime(lastManualRefreshAt)}</span> : null}
+        {orderAlert ? (
+          <aside className="new-order-alert" role="alert" aria-live="assertive">
+            <BellRing aria-hidden="true" />
+            <div>
+              <strong>New order #{orderAlert.order_no}</strong>
+              <span>{orderAlert.service_zone_name ?? orderAlert.service_zone_code ?? 'Unmapped polygon'} just entered the queue.</span>
+            </div>
+            <button className="new-order-alert-open" type="button" onClick={() => { openOrderNo(orderAlert.order_no); setOrderAlert(null) }}>
+              Open
+            </button>
+            <button className="new-order-alert-dismiss" type="button" onClick={() => setOrderAlert(null)} aria-label="Dismiss new order alert" title="Dismiss">
+              <X aria-hidden="true" />
+            </button>
+          </aside>
+        ) : null}
 
         {activeTab === 'overview' ? (
           <section className="overview-grid">
