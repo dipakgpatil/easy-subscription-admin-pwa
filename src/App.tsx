@@ -30,7 +30,15 @@ import {
   updateReferralConfig,
   verifyAdminOtp,
 } from './lib/api'
-import { clearSession, readActiveTab, readSession, writeActiveTab, writeSession } from './lib/storage'
+import {
+  clearSession,
+  readActiveTab,
+  readSession,
+  readSidebarCollapsed,
+  writeActiveTab,
+  writeSession,
+  writeSidebarCollapsed,
+} from './lib/storage'
 import type {
   AdminDashboard,
   AdminOrderHistory,
@@ -188,21 +196,20 @@ function OrderJourney({ order }: { order: AdminOrderDetail }) {
     <section className="journey-panel" aria-label={`Order ${order.order_no} delivery journey`}>
       <div className="journey-head">
         <div>
-          <p className="section-kicker">Live order journey</p>
+          <p className="section-kicker">Order journey</p>
           <h3>{journey.current_stage}</h3>
         </div>
         <div className="status-cluster">
           {journey.dispatch_status ? <span className={`badge ${badgeTone(journey.dispatch_status)}`}>{journey.dispatch_status}</span> : null}
-          {journey.rider ? <ContactAction label={journey.rider.display_name} mobileNo={journey.rider.mobile_no} /> : null}
         </div>
       </div>
       <ol className="journey-flow">
         {journey.steps.map((step) => (
           <li key={step.label} className={`journey-step is-${step.status.toLowerCase().replaceAll('_', '-')}`}>
             <span className={`journey-dot ${badgeTone(step.status)}`} aria-hidden="true" />
+            <span className="journey-step-status">{formatRelativeStatus(step.status)}</span>
             <strong>{step.label}</strong>
             <small>{formatDateTime(step.timestamp)}</small>
-            <span className="sr-only">{step.status}</span>
           </li>
         ))}
       </ol>
@@ -219,6 +226,7 @@ function App() {
     }
     return 'overview'
   })
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => readSidebarCollapsed())
   const [loginMode, setLoginMode] = useState<LoginMode>('google')
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null)
   const [orderHistory, setOrderHistory] = useState<AdminOrderHistory | null>(null)
@@ -277,6 +285,7 @@ function App() {
 
   const zoneOptions = dashboard?.zone_summary ?? []
   const liveRiders = riders?.items.filter((rider) => rider.latitude !== null && rider.longitude !== null) ?? []
+  const selectedOrderRider = selectedOrder?.journey?.rider ?? selectedOrder?.fulfillment_groups.find((group) => group.rider)?.rider ?? null
   const historyMaxOrders = Math.max(1, ...(orderHistory?.daily.map((day) => day.completed_orders) ?? [0]))
 
   async function handleAuthSuccess(nextSession: AdminSession) {
@@ -355,16 +364,11 @@ function App() {
       zoneCode: zoneFilter || undefined,
     })
     setOrders(payload)
-    setSelectedOrderNo((current) =>
-      payload.items.length > 0 && !payload.items.some((item) => item.order_no === current)
-        ? payload.items[0].order_no
-        : current,
-    )
-    if (payload.items.length === 0) {
+    if (selectedOrderNo !== null && !payload.items.some((item) => item.order_no === selectedOrderNo)) {
       setSelectedOrderNo(null)
       setSelectedOrder(null)
     }
-  }, [deferredOrderQuery, ordersPage, session, zoneFilter])
+  }, [deferredOrderQuery, ordersPage, selectedOrderNo, session, zoneFilter])
 
   const loadCatalogSetup = useCallback(async () => {
     if (!session) {
@@ -460,6 +464,7 @@ function App() {
       if (activeTab === 'orders') {
         await loadOrders()
         await loadSelectedOrder()
+        await loadRiders()
       }
       if (activeTab === 'history') {
         await loadOrderHistory()
@@ -665,6 +670,10 @@ function App() {
     writeActiveTab(activeTab)
   }, [activeTab])
 
+  useEffect(() => {
+    writeSidebarCollapsed(sidebarCollapsed)
+  }, [sidebarCollapsed])
+
   async function handleOrderAction(woNo: number, orderStatus: string) {
     if (!session) {
       return
@@ -803,7 +812,13 @@ function App() {
     startTransition(() => {
       setActiveTab('orders')
       setSelectedOrderNo(item.order_no)
+      setSelectedOrder(null)
     })
+  }
+
+  function closeOrderContext() {
+    setSelectedOrderNo(null)
+    setSelectedOrder(null)
   }
 
   function openMerchantPayout(summary: AdminMerchantPayoutSummary) {
@@ -961,10 +976,20 @@ function App() {
   }
 
   return (
-    <main className="app-shell">
+    <main className={sidebarCollapsed ? 'app-shell sidebar-is-collapsed' : 'app-shell'}>
       <aside className="sidebar">
         <div className="sidebar-brand">
           <img className="sidebar-logo" src="/admin-logo.svg" alt="Cravix Admin" />
+          <span className="sidebar-mark" aria-hidden="true">C</span>
+          <button
+            className="sidebar-toggle"
+            type="button"
+            onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+            aria-label={sidebarCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+            title={sidebarCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+          >
+            <span aria-hidden="true" />
+          </button>
         </div>
         <nav className="sidebar-nav">
           {[
@@ -984,30 +1009,34 @@ function App() {
               key={tab}
               className={activeTab === tab ? 'nav-pill is-active' : 'nav-pill'}
               onClick={() => setActiveTab(tab as ViewTab)}
+              title={label}
             >
-              {label}
+              <span className="nav-mark" aria-hidden="true">{label.charAt(0)}</span>
+              <span className="nav-label">{label}</span>
             </button>
           ))}
         </nav>
         <div className="sidebar-footer">
           <div className="operator-chip">
+            <span className="operator-mark" aria-hidden="true">{(session.display_name ?? 'C').charAt(0)}</span>
             <strong>{session.display_name ?? 'Cravix Admin'}</strong>
             <span>{session.email_address ?? session.mobile_no ?? 'Administrator'}</span>
           </div>
-          <button className="ghost-button" onClick={handleLogout}>
-            Sign out
+          <button className="ghost-button sign-out-button" onClick={handleLogout} title="Sign out">
+            <span className="nav-mark" aria-hidden="true">S</span>
+            <span className="nav-label">Sign out</span>
           </button>
         </div>
       </aside>
 
-      <section className="workspace">
+      <section className={activeTab === 'orders' && selectedOrder ? 'workspace workspace-order-context' : 'workspace'}>
         <header className="topbar">
           <div>
-            <p className="eyebrow">Operations Control</p>
+            <p className="eyebrow">{activeTab === 'orders' && selectedOrder ? 'Order workspace' : 'Operations Control'}</p>
             <h1>
               {activeTab === 'overview' && 'Control tower overview'}
               {activeTab === 'catalog' && 'Catalog and merchant setup'}
-              {activeTab === 'orders' && 'Order search and intervention'}
+              {activeTab === 'orders' && (selectedOrder ? `Order #${selectedOrder.order_no}` : 'Order search and intervention')}
               {activeTab === 'history' && 'Completed order history'}
               {activeTab === 'riders' && 'Rider live operations'}
               {activeTab === 'payouts' && 'Merchant payout desk'}
@@ -1019,7 +1048,12 @@ function App() {
             </h1>
           </div>
           <div className="topbar-actions">
-            {activeTab === 'overview' || activeTab === 'orders' || activeTab === 'history' ? (
+            {activeTab === 'orders' && selectedOrderNo !== null ? (
+              <button className="back-to-orders" type="button" onClick={closeOrderContext}>
+                All orders
+              </button>
+            ) : null}
+            {activeTab === 'overview' || (activeTab === 'orders' && selectedOrderNo === null) || activeTab === 'history' ? (
               <label className="area-selector">
                 <span>Area</span>
                 <select
@@ -1378,15 +1412,195 @@ function App() {
         ) : null}
 
         {activeTab === 'orders' ? (
-          <section className="split-layout">
-            <section className="panel list-panel">
-              <div className="panel-head compact">
+          selectedOrder ? (
+            <section className="order-workspace">
+              <section className="order-summary-card">
+                <div className="order-summary-heading">
+                  <div>
+                    <p className="section-kicker">Live fulfillment</p>
+                    <h2>Order #{selectedOrder.order_no}</h2>
+                  </div>
+                  <span className={`badge ${badgeTone(selectedOrder.order_status)}`}>{selectedOrder.order_status}</span>
+                </div>
+                <div className="order-summary-facts">
+                  <div>
+                    <span>Customer</span>
+                    <strong>{selectedOrder.customer.name ?? 'Unknown customer'}</strong>
+                    {selectedOrder.customer.mobile_no ? <ContactAction label="customer" mobileNo={selectedOrder.customer.mobile_no} /> : <small>No phone saved</small>}
+                  </div>
+                  <div>
+                    <span>Delivery</span>
+                    <strong title={selectedOrder.delivery.full_address ?? undefined}>{selectedOrder.delivery.full_address ?? 'No address'}</strong>
+                    <small>{selectedOrder.delivery.service_zone_name ?? selectedOrder.delivery.service_zone_code ?? 'No zone'}</small>
+                  </div>
+                  <div>
+                    <span>Payment</span>
+                    <strong>{selectedOrder.payment.payment_status ?? 'No payment'}</strong>
+                    <small>{formatMoney(selectedOrder.payment.payment_amount)}</small>
+                  </div>
+                  <div>
+                    <span>Placed</span>
+                    <strong>{formatDateTime(selectedOrder.order_placed_on)}</strong>
+                    <small>{selectedOrder.issue_flags.length ? selectedOrder.issue_flags.map(formatRelativeStatus).join(', ') : 'No active issues'}</small>
+                  </div>
+                </div>
+              </section>
+
+              <OrderJourney order={selectedOrder} />
+
+              <section className="order-operations-grid">
+                <article className="order-priority-card rider-priority-card">
+                  <div className="order-priority-heading">
+                    <div>
+                      <p className="section-kicker">Rider</p>
+                      <h2>{selectedOrderRider?.display_name ?? 'Awaiting rider allocation'}</h2>
+                    </div>
+                    {selectedOrderRider ? <span className={`badge ${badgeTone(selectedOrderRider.availability_status)}`}>{selectedOrderRider.availability_status}</span> : null}
+                  </div>
+                  {selectedOrderRider ? (
+                    <div className="rider-priority-details">
+                      <p>{selectedOrderRider.location_updated_at ? `Location updated ${formatDateTime(selectedOrderRider.location_updated_at)}` : 'Live location not reported yet'}</p>
+                      <div className="priority-actions">
+                        <ContactAction label={selectedOrderRider.display_name} mobileNo={selectedOrderRider.mobile_no} />
+                        {selectedOrderRider.latitude !== null && selectedOrderRider.longitude !== null ? (
+                          <a className="maps-link" href={`https://maps.google.com/?q=${selectedOrderRider.latitude},${selectedOrderRider.longitude}`} target="_blank" rel="noreferrer">
+                            Open live location
+                          </a>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="muted-line">Assign a live rider from a fulfillment action below. The journey will update as soon as the rider accepts.</p>
+                  )}
+                </article>
+
+                <article className="order-priority-card kitchen-priority-card">
+                  <div className="order-priority-heading">
+                    <div>
+                      <p className="section-kicker">Kitchens</p>
+                      <h2>{selectedOrder.fulfillment_groups.length} fulfillment {selectedOrder.fulfillment_groups.length === 1 ? 'group' : 'groups'}</h2>
+                    </div>
+                  </div>
+                  <div className="kitchen-priority-list">
+                    {selectedOrder.fulfillment_groups.map((group) => (
+                      <div key={group.wo_no}>
+                        <strong>{group.merchant?.display_name ?? 'Unassigned merchant'}</strong>
+                        <span>{group.estimated_prep_minutes ? `${group.estimated_prep_minutes} min prep` : 'Prep time not set'}</span>
+                        <span className={`badge ${badgeTone(group.order_status)}`}>{group.order_status}</span>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              </section>
+
+              <section className="fulfillment-stack order-fulfillment-stack">
+                {selectedOrder.fulfillment_groups.map((group) => (
+                  <article key={group.wo_no} className="fulfillment-card">
+                    <div className="fulfillment-head">
+                      <div>
+                        <p className="section-kicker">Kitchen fulfillment #{group.wo_no}</p>
+                        <h3>{group.merchant?.display_name ?? 'Unassigned merchant'}</h3>
+                        <p>{group.merchant?.location_label ?? 'No merchant location label'}</p>
+                        {group.merchant ? <ContactAction label={group.merchant.display_name} mobileNo={group.merchant.mobile_no} /> : null}
+                      </div>
+                      <div className="status-cluster">
+                        <span className={`badge ${badgeTone(group.order_status)}`}>{group.order_status}</span>
+                        {group.payout_status ? <span className={`badge ${badgeTone(group.payout_status)}`}>{group.payout_status}</span> : null}
+                      </div>
+                    </div>
+
+                    <div className="fulfillment-meta">
+                      <span>Subtotal <strong>{formatMoney(group.subtotal_amount)}</strong></span>
+                      <span>Preparation <strong>{group.estimated_prep_minutes ? `${group.estimated_prep_minutes} min` : 'Not set'}</strong></span>
+                      <span>Assigned rider <strong>{group.rider?.display_name ?? 'Not assigned'}</strong></span>
+                    </div>
+
+                    <div className="kitchen-timeline">
+                      {group.timeline.map((step) => (
+                        <div key={`${group.wo_no}-${step.label}`} className="kitchen-timeline-step">
+                          <span className={`journey-dot ${badgeTone(step.status)}`} aria-hidden="true" />
+                          <strong>{step.label}</strong>
+                          <small>{formatDateTime(step.timestamp)}</small>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="action-row fulfillment-actions">
+                      <select
+                        value={assignmentDrafts[group.wo_no] ?? ''}
+                        onChange={(event) =>
+                          setAssignmentDrafts((current) => ({
+                            ...current,
+                            [group.wo_no]: event.target.value,
+                          }))
+                        }
+                      >
+                        <option value="">Select a live rider</option>
+                        {liveRiders.map((rider) => (
+                          <option key={rider.rider_uid} value={String(rider.rider_uid)}>
+                            {rider.display_name}
+                          </option>
+                        ))}
+                      </select>
+                      {nextActionsForStatus(group.order_status).map((action) => (
+                        <button
+                          key={action}
+                          className={action === 'COMPLETED' ? 'secondary-button' : 'ghost-button'}
+                          onClick={() => void handleOrderAction(group.wo_no, action)}
+                          disabled={loadingKey === `order-${group.wo_no}-${action}`}
+                        >
+                          {loadingKey === `order-${group.wo_no}-${action}` ? 'Updating...' : action.replaceAll('_', ' ')}
+                        </button>
+                      ))}
+                    </div>
+                  </article>
+                ))}
+              </section>
+
+              <section className="order-items-panel">
+                <div className="panel-head">
+                  <div>
+                    <p className="section-kicker">Order items</p>
+                    <h2>What each kitchen is preparing</h2>
+                  </div>
+                  <span>{selectedOrder.fulfillment_groups.reduce((count, group) => count + group.items.length, 0)} line items</span>
+                </div>
+                <div className="items-by-kitchen">
+                  {selectedOrder.fulfillment_groups.map((group) => (
+                    <article key={`items-${group.wo_no}`} className="items-kitchen-group">
+                      <div className="items-kitchen-heading">
+                        <div>
+                          <strong>{group.merchant?.display_name ?? 'Unassigned merchant'}</strong>
+                          <span>Fulfillment #{group.wo_no}</span>
+                        </div>
+                        <span className={`badge ${badgeTone(group.order_status)}`}>{group.order_status}</span>
+                      </div>
+                      <div className="item-list">
+                        {group.items.map((item) => (
+                          <div key={`${group.wo_no}-${item.item_no}`} className="item-row">
+                            <div className="item-copy">
+                              <strong>{item.product_name}</strong>
+                              <span>{item.product_code}</span>
+                            </div>
+                            <strong>x {item.quantity}</strong>
+                          </div>
+                        ))}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            </section>
+          ) : (
+            <section className="orders-browser panel">
+              <div className="orders-browser-header">
                 <div>
                   <p className="section-kicker">Orders</p>
-                  <h2>Search and filter live or historical parent orders</h2>
+                  <h2>Search and open an order workspace</h2>
                 </div>
+                <span>{orders?.total ?? 0} matching orders</span>
               </div>
-              <div className="filter-grid">
+              <div className="filter-grid orders-filter-grid">
                 <label>
                   Search
                   <input
@@ -1416,13 +1630,9 @@ function App() {
                   </select>
                 </label>
               </div>
-              <div className="order-stack">
+              <div className="orders-grid">
                 {(orders?.items ?? []).map((item) => (
-                  <button
-                    key={item.order_no}
-                    className={selectedOrderNo === item.order_no ? 'list-card is-selected' : 'list-card'}
-                    onClick={() => setSelectedOrderNo(item.order_no)}
-                  >
+                  <button key={item.order_no} className="order-browser-card" onClick={() => openOrder(item)}>
                     <div className="list-card-top">
                       <div>
                         <strong>#{item.order_no}</strong>
@@ -1433,18 +1643,14 @@ function App() {
                     <p>{item.delivery_address ?? 'No delivery address saved'}</p>
                     <div className="meta-row">
                       <span>{item.service_zone_name ?? item.service_zone_code ?? 'No zone'}</span>
-                      <span>{formatMoney(item.payment_amount)}</span>
+                      <strong>{formatMoney(item.payment_amount)}</strong>
                     </div>
                     <div className="tag-row">
                       {item.merchant_names.slice(0, 2).map((merchant) => (
-                        <span key={merchant} className="tiny-flag">
-                          {merchant}
-                        </span>
+                        <span key={merchant} className="tiny-flag">{merchant}</span>
                       ))}
                       {item.issue_flags.map((flag) => (
-                        <span key={flag} className="tiny-flag warning">
-                          {formatRelativeStatus(flag)}
-                        </span>
+                        <span key={flag} className="tiny-flag warning">{formatRelativeStatus(flag)}</span>
                       ))}
                     </div>
                   </button>
@@ -1459,120 +1665,7 @@ function App() {
                 onNext={() => setOrdersPage((current) => current + 1)}
               />
             </section>
-
-            <section className="panel detail-panel">
-              {selectedOrder ? (
-                <>
-                  <div className="panel-head">
-                    <div>
-                      <p className="section-kicker">Order Detail</p>
-                      <h2>#{selectedOrder.order_no}</h2>
-                    </div>
-                    <span className={`badge ${badgeTone(selectedOrder.order_status)}`}>{selectedOrder.order_status}</span>
-                  </div>
-
-                  <div className="cards-grid">
-                    <DetailCard title="Customer" body={selectedOrder.customer.name ?? 'Unknown customer'} meta={selectedOrder.customer.mobile_no ?? 'No phone'} />
-                    <DetailCard title="Delivery" body={selectedOrder.delivery.full_address ?? 'No address'} meta={selectedOrder.delivery.service_zone_name ?? selectedOrder.delivery.service_zone_code ?? 'No zone'} />
-                    <DetailCard title="Payment" body={selectedOrder.payment.payment_status ?? 'No payment'} meta={formatMoney(selectedOrder.payment.payment_amount)} />
-                    <DetailCard title="Placed On" body={formatDateTime(selectedOrder.order_placed_on)} meta={selectedOrder.issue_flags.length ? selectedOrder.issue_flags.map(formatRelativeStatus).join(' • ') : 'Healthy'} />
-                  </div>
-
-                  <OrderJourney order={selectedOrder} />
-
-                  <div className="fulfillment-stack">
-                    {selectedOrder.fulfillment_groups.map((group) => (
-                      <article key={group.wo_no} className="fulfillment-card">
-                        <div className="fulfillment-head">
-                          <div>
-                            <p className="section-kicker">Fulfillment #{group.wo_no}</p>
-                            <h3>{group.merchant?.display_name ?? 'Unassigned merchant'}</h3>
-                            <p>{group.merchant?.location_label ?? 'No merchant location label'}</p>
-                            {group.merchant ? <ContactAction label={group.merchant.display_name} mobileNo={group.merchant.mobile_no} /> : null}
-                          </div>
-                          <div className="status-cluster">
-                            <span className={`badge ${badgeTone(group.order_status)}`}>{group.order_status}</span>
-                            {group.payout_status ? <span className={`badge ${badgeTone(group.payout_status)}`}>{group.payout_status}</span> : null}
-                          </div>
-                        </div>
-
-                        <div className="fulfillment-meta">
-                          <span>Subtotal {formatMoney(group.subtotal_amount)}</span>
-                          <span>Prep {group.estimated_prep_minutes ? `${group.estimated_prep_minutes} min` : 'Not set'}</span>
-                          <span>{group.rider?.display_name ?? 'No rider assigned yet'}</span>
-                          {group.rider ? <ContactAction label={group.rider.display_name} mobileNo={group.rider.mobile_no} /> : null}
-                        </div>
-
-                        {group.rider && group.rider.latitude !== null && group.rider.longitude !== null ? (
-                          <a
-                            className="maps-link"
-                            href={`https://maps.google.com/?q=${group.rider.latitude},${group.rider.longitude}`}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            Open rider live location
-                          </a>
-                        ) : null}
-
-                        <div className="timeline-grid">
-                          {group.timeline.map((step) => (
-                            <div key={`${group.wo_no}-${step.label}`} className="timeline-step">
-                              <span className={`badge ${badgeTone(step.status)}`}>{step.status}</span>
-                              <strong>{step.label}</strong>
-                              <small>{formatDateTime(step.timestamp)}</small>
-                            </div>
-                          ))}
-                        </div>
-
-                        <div className="item-list">
-                          {group.items.map((item) => (
-                            <div key={`${group.wo_no}-${item.item_no}`} className="item-row">
-                              <div className="item-copy">
-                                <strong>{item.product_name}</strong>
-                                <span>{item.product_code}</span>
-                              </div>
-                              <span>x {item.quantity}</span>
-                            </div>
-                          ))}
-                        </div>
-
-                        <div className="action-row">
-                          <select
-                            value={assignmentDrafts[group.wo_no] ?? ''}
-                            onChange={(event) =>
-                              setAssignmentDrafts((current) => ({
-                                ...current,
-                                [group.wo_no]: event.target.value,
-                              }))
-                            }
-                          >
-                            <option value="">Pick rider for assignment actions</option>
-                            {liveRiders.map((rider) => (
-                              <option key={rider.rider_uid} value={String(rider.rider_uid)}>
-                                {rider.display_name}
-                              </option>
-                            ))}
-                          </select>
-                          {nextActionsForStatus(group.order_status).map((action) => (
-                            <button
-                              key={action}
-                              className={action === 'COMPLETED' ? 'secondary-button' : 'ghost-button'}
-                              onClick={() => void handleOrderAction(group.wo_no, action)}
-                              disabled={loadingKey === `order-${group.wo_no}-${action}`}
-                            >
-                              {loadingKey === `order-${group.wo_no}-${action}` ? 'Updating...' : action.replaceAll('_', ' ')}
-                            </button>
-                          ))}
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <EmptyState title="Pick an order" body="Select any order from the left column to open the operator dashboard for that basket." />
-              )}
-            </section>
-          </section>
+          )
         ) : null}
 
         {activeTab === 'riders' ? (
