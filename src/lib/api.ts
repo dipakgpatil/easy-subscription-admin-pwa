@@ -22,9 +22,15 @@ import type {
   AdminWalletCreditResponse,
 } from './types'
 
+const PRODUCTION_ADMIN_ORIGIN = 'https://admin.cravix.co.in'
+const PRODUCTION_API_BASE_URL = 'https://api.cravix.co.in/api/v1'
 const DEFAULT_API_BASE_URL = 'https://easy-subscription-python-api-production.up.railway.app/api/v1'
 const DEFAULT_GOOGLE_CLIENT_ID = '448494748748-hiu2s00n0fkegd8p23n3g2tuaihqjfdi.apps.googleusercontent.com'
-const API_BASE_URL = ((import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '').trim() || DEFAULT_API_BASE_URL
+const configuredApiBaseUrl = ((import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '').trim()
+const API_BASE_URL =
+  typeof window !== 'undefined' && window.location.origin === PRODUCTION_ADMIN_ORIGIN
+    ? PRODUCTION_API_BASE_URL
+    : configuredApiBaseUrl || DEFAULT_API_BASE_URL
 
 export const appConfig = {
   apiBaseUrl: API_BASE_URL,
@@ -256,6 +262,7 @@ type RequestOptions = {
   token?: string
   body?: unknown
   query?: Record<string, string | number | undefined>
+  credentials?: RequestCredentials
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -278,6 +285,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
         ...(country ? { 'X-Client-Country': country } : {}),
       },
       body: options.body ? JSON.stringify(options.body) : undefined,
+      credentials: options.credentials ?? 'same-origin',
       signal: AbortSignal.timeout(20000),
     })
   } catch (error) {
@@ -312,6 +320,12 @@ export async function loginAdminWithGoogleIdToken(idToken: string): Promise<Admi
   return request<AdminSession>('/admin/auth/google/login', {
     method: 'POST',
     body: { idToken },
+  })
+}
+
+export async function completeAdminGoogleRedirectLogin(): Promise<AdminSession> {
+  return request<AdminSession>('/admin/auth/google/redirect/session', {
+    credentials: 'include',
   })
 }
 

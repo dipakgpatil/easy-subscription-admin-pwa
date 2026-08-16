@@ -17,7 +17,7 @@ npm install
 npm run dev
 ```
 
-The app defaults to the production Railway API. Create `.env.local` to use another backend:
+The app defaults to `https://api.cravix.co.in/api/v1` when served at `https://admin.cravix.co.in`. Create `.env.local` to use another backend:
 
 ```text
 VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1
@@ -54,6 +54,6 @@ Production output is written to `dist/`.
 
 The checked-in `Dockerfile`, `Caddyfile`, and `railway.json` build and serve the PWA. Use `railway.variables.example.json` as the variable template. The approved Cravix production Web OAuth client is built in as a fallback; `VITE_GOOGLE_CLIENT_ID` is only needed to override it. `VITE_*` values are embedded during the image build, so changing one requires a rebuild.
 
-The Caddy content-security policy permits the default production API and Google Identity domains. If `VITE_API_BASE_URL` moves to another origin, add that exact HTTPS origin to `connect-src` in `Caddyfile` before deployment.
+The Caddy content-security policy permits the default production API and Google Identity domains. Google sign-in is full-page redirect mode: Caddy proxies only `/api/v1/admin/auth/google/redirect` to the API so Google can preserve its same-origin CSRF check, then the app completes a two-minute HttpOnly handoff from `https://api.cravix.co.in`. Add `https://admin.cravix.co.in/api/v1/admin/auth/google/redirect` to the Web OAuth client's authorized redirect URIs. If `VITE_API_BASE_URL` moves to another origin, add that exact HTTPS origin to `connect-src` in `Caddyfile` before deployment.
 
 The production server applies CSP, HSTS, frame denial, restrictive browser permissions, immutable hashed-asset caching, and no-store caching for the application shell and service worker. Admin tokens use tab-scoped `sessionStorage`; telemetry never intentionally sends request bodies, tokens, OTPs, payment data, raw IPs, or stack traces.

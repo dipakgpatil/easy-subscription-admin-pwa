@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useDeferredValue, useEffect, useEffectEvent, useRef, useState } from 'react'
+import { startTransition, useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
 import './App.css'
 import ObservabilityView from './features/observability/ObservabilityView'
 import DispatchView from './features/dispatch/DispatchView'
@@ -7,6 +7,7 @@ import {
   ApiError,
   assignProductToMerchant,
   appConfig,
+  completeAdminGoogleRedirectLogin,
   createCatalogProduct,
   creditReferralWallet,
   getDashboard,
@@ -20,7 +21,6 @@ import {
   getReferralConfig,
   getReferralList,
   getRiders,
-  loginAdminWithGoogleIdToken,
   loginAdminWithMockGoogleProfile,
   markMerchantPayoutPaid,
   requestAdminOtp,
@@ -299,18 +299,6 @@ function App() {
       setLoadingKey(null)
     }
   }
-
-  const completeGoogleLogin = useEffectEvent(async (credential: string) => {
-    setLoadingKey('login')
-    setLastError(null)
-    try {
-      await handleAuthSuccess(await loginAdminWithGoogleIdToken(credential))
-    } catch (error) {
-      setLastError(getErrorMessage(error))
-    } finally {
-      setLoadingKey(null)
-    }
-  })
 
   async function handleRequestOtp() {
     setLoadingKey('otp-request')
@@ -618,15 +606,21 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (session || loginMode !== 'google' || !googleScriptReady || !googleButtonRef.current || !appConfig.googleClientId) {
+    if (
+      session ||
+      window.location.pathname === '/auth/callback' ||
+      loginMode !== 'google' ||
+      !googleScriptReady ||
+      !googleButtonRef.current ||
+      !appConfig.googleClientId
+    ) {
       return
     }
     googleButtonRef.current.innerHTML = ''
     window.google?.accounts?.id?.initialize({
       client_id: appConfig.googleClientId,
-      callback: ({ credential }) => {
-        void completeGoogleLogin(credential)
-      },
+      ux_mode: 'redirect',
+      login_uri: `${window.location.origin}/api/v1/admin/auth/google/redirect`,
     })
     window.google?.accounts?.id?.renderButton(googleButtonRef.current, {
       theme: 'filled_black',
@@ -636,6 +630,36 @@ function App() {
       width: 280,
     })
   }, [session, loginMode, googleScriptReady])
+
+  useEffect(() => {
+    if (session || window.location.pathname !== '/auth/callback') {
+      return
+    }
+
+    let cancelled = false
+    setLoadingKey('google-redirect')
+    setLastError(null)
+    void completeAdminGoogleRedirectLogin()
+      .then((nextSession) => {
+        if (cancelled) return
+        void handleAuthSuccess(nextSession)
+        window.history.replaceState({}, document.title, '/')
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setLastError(getErrorMessage(error))
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingKey(null)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [session])
 
   useEffect(() => {
     writeActiveTab(activeTab)
@@ -814,6 +838,8 @@ function App() {
     setWalletCreditResult(null)
   }
 
+  const isGoogleRedirectCallback = window.location.pathname === '/auth/callback'
+
   if (!session) {
     return (
       <main className="auth-shell">
@@ -829,6 +855,31 @@ function App() {
             </div>
           </div>
 
+          {isGoogleRedirectCallback ? (
+            <section className="auth-panel">
+              <div className="auth-panel-copy">
+                <h2>{loadingKey === 'google-redirect' ? 'Completing Google sign-in' : 'Google sign-in needs another try'}</h2>
+                <p>
+                  {loadingKey === 'google-redirect'
+                    ? 'Securely confirming your administrator access.'
+                    : 'The sign-in handoff was not available. Return to the portal and choose Google sign-in again.'}
+                </p>
+              </div>
+              {lastError ? <p className="error-banner">{lastError}</p> : null}
+              <button
+                className="secondary-button"
+                onClick={() => {
+                  window.history.replaceState({}, document.title, '/')
+                  setLastError(null)
+                  setLoadingKey(null)
+                  setLoginMode('google')
+                }}
+              >
+                Return to sign-in
+              </button>
+            </section>
+          ) : (
+            <>
           <div className="auth-mode-switch">
             <button className={loginMode === 'google' ? 'mode-pill is-active' : 'mode-pill'} onClick={() => setLoginMode('google')}>
               Google
@@ -902,6 +953,8 @@ function App() {
           )}
 
           {lastError ? <p className="error-banner">{lastError}</p> : null}
+            </>
+          )}
         </section>
       </main>
     )
