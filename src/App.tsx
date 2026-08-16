@@ -1,4 +1,20 @@
 import { startTransition, useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
+import {
+  Bike,
+  ChefHat,
+  CircleAlert,
+  CircleCheckBig,
+  CircleDot,
+  Clock3,
+  CreditCard,
+  MapPin,
+  Package,
+  PhoneCall,
+  Route,
+  ShoppingBag,
+  Truck,
+  UserRound,
+} from 'lucide-react'
 import './App.css'
 import ObservabilityView from './features/observability/ObservabilityView'
 import DispatchView from './features/dispatch/DispatchView'
@@ -120,15 +136,21 @@ function badgeTone(status: string | null | undefined): string {
     case 'SETTLED':
     case 'SUCCESS':
       return 'is-positive'
-    case 'READY':
-    case 'IN_TRANSIT':
     case 'PREPARING':
+    case 'READY':
+      return 'is-warning'
     case 'ASSIGNED':
+    case 'IN_TRANSIT':
     case 'IN_PROGRESS':
     case 'PICKED_UP':
-      return 'is-warning'
+      return 'is-info'
     case 'PENDING':
       return 'is-neutral'
+    case 'ESCALATED':
+    case 'DELAY_RISK':
+    case 'FAILED':
+    case 'CANCELLED':
+      return 'is-danger'
     default:
       return 'is-dark'
   }
@@ -181,9 +203,33 @@ function ContactAction({ label, mobileNo }: { label: string; mobileNo: string | 
   }
   return (
     <a className="contact-link" href={href} aria-label={`Call ${label} at ${mobileNo}`}>
-      Call {label}
+      <PhoneCall aria-hidden="true" />
+      <span className="contact-link-label">Call {label}</span>
       <span>{mobileNo}</span>
     </a>
+  )
+}
+
+function JourneyMarker({ label, status }: { label: string; status: string }) {
+  const normalized = label.toUpperCase()
+  const tone = badgeTone(status)
+  const MarkerIcon =
+    normalized.includes('DELIVER') || normalized.includes('PICKUP')
+      ? Truck
+      : normalized.includes('RIDER')
+        ? Bike
+        : normalized.includes('MERCHANT') || normalized.includes('PREPAR') || normalized.includes('READY')
+          ? ChefHat
+          : tone === 'is-positive'
+            ? CircleCheckBig
+            : tone === 'is-danger'
+              ? CircleAlert
+              : CircleDot
+
+  return (
+    <span className={`journey-step-icon ${tone}`} aria-hidden="true">
+      <MarkerIcon />
+    </span>
   )
 }
 
@@ -195,9 +241,12 @@ function OrderJourney({ order }: { order: AdminOrderDetail }) {
   return (
     <section className="journey-panel" aria-label={`Order ${order.order_no} delivery journey`}>
       <div className="journey-head">
-        <div>
-          <p className="section-kicker">Order journey</p>
-          <h3>{journey.current_stage}</h3>
+        <div className="journey-heading-copy">
+          <span className="section-icon section-icon--route" aria-hidden="true"><Route /></span>
+          <div>
+            <p className="section-kicker">Fulfillment timeline</p>
+            <h3>{journey.current_stage}</h3>
+          </div>
         </div>
         <div className="status-cluster">
           {journey.dispatch_status ? <span className={`badge ${badgeTone(journey.dispatch_status)}`}>{journey.dispatch_status}</span> : null}
@@ -206,7 +255,7 @@ function OrderJourney({ order }: { order: AdminOrderDetail }) {
       <ol className="journey-flow">
         {journey.steps.map((step) => (
           <li key={step.label} className={`journey-step is-${step.status.toLowerCase().replaceAll('_', '-')}`}>
-            <span className={`journey-dot ${badgeTone(step.status)}`} aria-hidden="true" />
+            <JourneyMarker label={step.label} status={step.status} />
             <span className="journey-step-status">{formatRelativeStatus(step.status)}</span>
             <strong>{step.label}</strong>
             <small>{formatDateTime(step.timestamp)}</small>
@@ -286,6 +335,7 @@ function App() {
   const zoneOptions = dashboard?.zone_summary ?? []
   const liveRiders = riders?.items?.filter((rider) => rider.latitude !== null && rider.longitude !== null) ?? []
   const selectedOrderRider = selectedOrder?.journey?.rider ?? selectedOrder?.fulfillment_groups.find((group) => group.rider)?.rider ?? null
+  const primaryOrderIssue = selectedOrder?.issue_flags[0] ?? null
   const historyMaxOrders = Math.max(1, ...(orderHistory?.daily.map((day) => day.completed_orders) ?? [0]))
 
   async function handleAuthSuccess(nextSession: AdminSession) {
@@ -1416,44 +1466,66 @@ function App() {
             <section className="order-workspace">
               <section className="order-summary-card">
                 <div className="order-summary-heading">
-                  <div>
-                    <p className="section-kicker">Live fulfillment</p>
-                    <h2>Order #{selectedOrder.order_no}</h2>
+                  <div className="order-summary-title">
+                    <span className="section-icon section-icon--order" aria-hidden="true"><ShoppingBag /></span>
+                    <div>
+                      <p className="section-kicker">Live fulfillment</p>
+                      <h2>Order brief</h2>
+                    </div>
                   </div>
-                  <span className={`badge ${badgeTone(selectedOrder.order_status)}`}>{selectedOrder.order_status}</span>
+                  {primaryOrderIssue ? (
+                    <span className="badge is-danger"><CircleAlert aria-hidden="true" /> {formatRelativeStatus(primaryOrderIssue)}</span>
+                  ) : (
+                    <span className={`badge ${badgeTone(selectedOrder.order_status)}`}>{selectedOrder.order_status}</span>
+                  )}
                 </div>
                 <div className="order-summary-facts">
-                  <div>
-                    <span>Customer</span>
-                    <strong>{selectedOrder.customer.name ?? 'Unknown customer'}</strong>
-                    {selectedOrder.customer.mobile_no ? <ContactAction label="customer" mobileNo={selectedOrder.customer.mobile_no} /> : <small>No phone saved</small>}
+                  <div className="order-summary-fact is-customer">
+                    <span className="fact-icon" aria-hidden="true"><UserRound /></span>
+                    <div>
+                      <span>Customer</span>
+                      <strong>{selectedOrder.customer.name ?? 'Unknown customer'}</strong>
+                      {selectedOrder.customer.mobile_no ? <ContactAction label="customer" mobileNo={selectedOrder.customer.mobile_no} /> : <small>No phone saved</small>}
+                    </div>
                   </div>
-                  <div>
-                    <span>Delivery</span>
-                    <strong title={selectedOrder.delivery.full_address ?? undefined}>{selectedOrder.delivery.full_address ?? 'No address'}</strong>
-                    <small>{selectedOrder.delivery.service_zone_name ?? selectedOrder.delivery.service_zone_code ?? 'No zone'}</small>
+                  <div className="order-summary-fact is-delivery">
+                    <span className="fact-icon" aria-hidden="true"><MapPin /></span>
+                    <div>
+                      <span>Delivery</span>
+                      <strong>{selectedOrder.delivery.full_address ?? 'No address'}</strong>
+                      <small>{selectedOrder.delivery.service_zone_name ?? selectedOrder.delivery.service_zone_code ?? 'No zone'}</small>
+                    </div>
                   </div>
-                  <div>
-                    <span>Payment</span>
-                    <strong>{selectedOrder.payment.payment_status ?? 'No payment'}</strong>
-                    <small>{formatMoney(selectedOrder.payment.payment_amount)}</small>
+                  <div className="order-summary-fact is-payment">
+                    <span className="fact-icon" aria-hidden="true"><CreditCard /></span>
+                    <div>
+                      <span>Payment</span>
+                      <strong>{selectedOrder.payment.payment_status ?? 'No payment'}</strong>
+                      <small>{formatMoney(selectedOrder.payment.payment_amount)}</small>
+                    </div>
                   </div>
-                  <div>
-                    <span>Placed</span>
-                    <strong>{formatDateTime(selectedOrder.order_placed_on)}</strong>
-                    <small>{selectedOrder.issue_flags.length ? selectedOrder.issue_flags.map(formatRelativeStatus).join(', ') : 'No active issues'}</small>
+                  <div className="order-summary-fact is-placed">
+                    <span className="fact-icon" aria-hidden="true"><Clock3 /></span>
+                    <div>
+                      <span>Placed</span>
+                      <strong>{formatDateTime(selectedOrder.order_placed_on)}</strong>
+                      <small>{primaryOrderIssue ? 'Operator attention needed' : 'No active issues'}</small>
+                    </div>
                   </div>
                 </div>
               </section>
 
               <OrderJourney order={selectedOrder} />
 
-              <section className="order-operations-grid">
-                <article className="order-priority-card rider-priority-card">
+              <section className={selectedOrder.fulfillment_groups.length > 1 ? 'order-operations-grid' : 'order-operations-grid is-single-focus'}>
+                <article className={selectedOrderRider ? 'order-priority-card rider-priority-card is-assigned' : 'order-priority-card rider-priority-card is-unassigned'}>
                   <div className="order-priority-heading">
-                    <div>
-                      <p className="section-kicker">Rider</p>
-                      <h2>{selectedOrderRider?.display_name ?? 'Awaiting rider allocation'}</h2>
+                    <div className="priority-title">
+                      <span className="section-icon section-icon--rider" aria-hidden="true"><Bike /></span>
+                      <div>
+                        <p className="section-kicker">Rider dispatch</p>
+                        <h2>{selectedOrderRider?.display_name ?? 'Rider needed'}</h2>
+                      </div>
                     </div>
                     {selectedOrderRider ? <span className={`badge ${badgeTone(selectedOrderRider.availability_status)}`}>{selectedOrderRider.availability_status}</span> : null}
                   </div>
@@ -1470,42 +1542,52 @@ function App() {
                       </div>
                     </div>
                   ) : (
-                    <p className="muted-line">Assign a live rider from a fulfillment action below. The journey will update as soon as the rider accepts.</p>
+                    <div className="dispatch-callout">
+                      <CircleAlert aria-hidden="true" />
+                      <p>Assign a nearby live rider from the fulfillment action below to move this order to pickup.</p>
+                    </div>
                   )}
                 </article>
 
-                <article className="order-priority-card kitchen-priority-card">
-                  <div className="order-priority-heading">
-                    <div>
-                      <p className="section-kicker">Kitchens</p>
-                      <h2>{selectedOrder.fulfillment_groups.length} fulfillment {selectedOrder.fulfillment_groups.length === 1 ? 'group' : 'groups'}</h2>
-                    </div>
-                  </div>
-                  <div className="kitchen-priority-list">
-                    {selectedOrder.fulfillment_groups.map((group) => (
-                      <div key={group.wo_no}>
-                        <strong>{group.merchant?.display_name ?? 'Unassigned merchant'}</strong>
-                        <span>{group.estimated_prep_minutes ? `${group.estimated_prep_minutes} min prep` : 'Prep time not set'}</span>
-                        <span className={`badge ${badgeTone(group.order_status)}`}>{group.order_status}</span>
+                {selectedOrder.fulfillment_groups.length > 1 ? (
+                  <article className="order-priority-card kitchen-priority-card">
+                    <div className="order-priority-heading">
+                      <div className="priority-title">
+                        <span className="section-icon section-icon--kitchen" aria-hidden="true"><ChefHat /></span>
+                        <div>
+                          <p className="section-kicker">Kitchen coordination</p>
+                          <h2>{selectedOrder.fulfillment_groups.length} kitchens in this order</h2>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </article>
+                    </div>
+                    <div className="kitchen-priority-list">
+                      {selectedOrder.fulfillment_groups.map((group) => (
+                        <div key={group.wo_no}>
+                          <strong>{group.merchant?.display_name ?? 'Unassigned merchant'}</strong>
+                          <span>{group.estimated_prep_minutes ? `${group.estimated_prep_minutes} min prep` : 'Prep time not set'}</span>
+                          <span className={`badge ${badgeTone(group.order_status)}`}>{group.order_status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </article>
+                ) : null}
               </section>
 
               <section className="fulfillment-stack order-fulfillment-stack">
                 {selectedOrder.fulfillment_groups.map((group) => (
                   <article key={group.wo_no} className="fulfillment-card">
                     <div className="fulfillment-head">
-                      <div>
-                        <p className="section-kicker">Kitchen fulfillment #{group.wo_no}</p>
-                        <h3>{group.merchant?.display_name ?? 'Unassigned merchant'}</h3>
-                        <p>{group.merchant?.location_label ?? 'No merchant location label'}</p>
-                        {group.merchant ? <ContactAction label={group.merchant.display_name} mobileNo={group.merchant.mobile_no} /> : null}
+                      <div className="fulfillment-title">
+                        <span className="section-icon section-icon--kitchen" aria-hidden="true"><ChefHat /></span>
+                        <div>
+                          <p className="section-kicker">Fulfillment #{group.wo_no}</p>
+                          <h3>{group.merchant?.display_name ?? 'Unassigned merchant'}</h3>
+                          <p>{group.merchant?.location_label ?? 'No merchant location label'}</p>
+                          {group.merchant ? <ContactAction label={group.merchant.display_name} mobileNo={group.merchant.mobile_no} /> : null}
+                        </div>
                       </div>
                       <div className="status-cluster">
                         <span className={`badge ${badgeTone(group.order_status)}`}>{group.order_status}</span>
-                        {group.payout_status ? <span className={`badge ${badgeTone(group.payout_status)}`}>{group.payout_status}</span> : null}
                       </div>
                     </div>
 
@@ -1518,30 +1600,51 @@ function App() {
                     <div className="kitchen-timeline">
                       {group.timeline.map((step) => (
                         <div key={`${group.wo_no}-${step.label}`} className="kitchen-timeline-step">
-                          <span className={`journey-dot ${badgeTone(step.status)}`} aria-hidden="true" />
+                          <JourneyMarker label={step.label} status={step.status} />
                           <strong>{step.label}</strong>
                           <small>{formatDateTime(step.timestamp)}</small>
                         </div>
                       ))}
                     </div>
 
-                    <div className="action-row fulfillment-actions">
-                      <select
-                        value={assignmentDrafts[group.wo_no] ?? ''}
-                        onChange={(event) =>
-                          setAssignmentDrafts((current) => ({
-                            ...current,
-                            [group.wo_no]: event.target.value,
-                          }))
-                        }
-                      >
-                        <option value="">Select a live rider</option>
-                        {liveRiders.map((rider) => (
-                          <option key={rider.rider_uid} value={String(rider.rider_uid)}>
-                            {rider.display_name}
-                          </option>
+                    <section className="fulfillment-items">
+                      <div className="fulfillment-items-head">
+                        <div><Package aria-hidden="true" /><strong>Items to pack</strong></div>
+                        <span>{group.items.length} {group.items.length === 1 ? 'item' : 'items'}</span>
+                      </div>
+                      <div className="item-list">
+                        {group.items.map((item) => (
+                          <div key={`${group.wo_no}-${item.item_no}`} className="item-row">
+                            <div className="item-copy">
+                              <strong>{item.product_name}</strong>
+                              <span>{item.product_code}</span>
+                            </div>
+                            <strong>x {item.quantity}</strong>
+                          </div>
                         ))}
-                      </select>
+                      </div>
+                    </section>
+
+                    <div className="action-row fulfillment-actions">
+                      <label className="rider-assignment">
+                        <span><Bike aria-hidden="true" /> Rider assignment</span>
+                        <select
+                          value={assignmentDrafts[group.wo_no] ?? ''}
+                          onChange={(event) =>
+                            setAssignmentDrafts((current) => ({
+                              ...current,
+                              [group.wo_no]: event.target.value,
+                            }))
+                          }
+                        >
+                          <option value="">Select a live rider</option>
+                          {liveRiders.map((rider) => (
+                            <option key={rider.rider_uid} value={String(rider.rider_uid)}>
+                              {rider.display_name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
                       {nextActionsForStatus(group.order_status).map((action) => (
                         <button
                           key={action}
@@ -1555,40 +1658,6 @@ function App() {
                     </div>
                   </article>
                 ))}
-              </section>
-
-              <section className="order-items-panel">
-                <div className="panel-head">
-                  <div>
-                    <p className="section-kicker">Order items</p>
-                    <h2>What each kitchen is preparing</h2>
-                  </div>
-                  <span>{selectedOrder.fulfillment_groups.reduce((count, group) => count + group.items.length, 0)} line items</span>
-                </div>
-                <div className="items-by-kitchen">
-                  {selectedOrder.fulfillment_groups.map((group) => (
-                    <article key={`items-${group.wo_no}`} className="items-kitchen-group">
-                      <div className="items-kitchen-heading">
-                        <div>
-                          <strong>{group.merchant?.display_name ?? 'Unassigned merchant'}</strong>
-                          <span>Fulfillment #{group.wo_no}</span>
-                        </div>
-                        <span className={`badge ${badgeTone(group.order_status)}`}>{group.order_status}</span>
-                      </div>
-                      <div className="item-list">
-                        {group.items.map((item) => (
-                          <div key={`${group.wo_no}-${item.item_no}`} className="item-row">
-                            <div className="item-copy">
-                              <strong>{item.product_name}</strong>
-                              <span>{item.product_code}</span>
-                            </div>
-                            <strong>x {item.quantity}</strong>
-                          </div>
-                        ))}
-                      </div>
-                    </article>
-                  ))}
-                </div>
               </section>
             </section>
           ) : (
