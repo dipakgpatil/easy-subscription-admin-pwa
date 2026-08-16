@@ -284,7 +284,7 @@ function App() {
   const deferredReferralQuery = useDeferredValue(referralQuery)
 
   const zoneOptions = dashboard?.zone_summary ?? []
-  const liveRiders = riders?.items.filter((rider) => rider.latitude !== null && rider.longitude !== null) ?? []
+  const liveRiders = riders?.items?.filter((rider) => rider.latitude !== null && rider.longitude !== null) ?? []
   const selectedOrderRider = selectedOrder?.journey?.rider ?? selectedOrder?.fulfillment_groups.find((group) => group.rider)?.rider ?? null
   const historyMaxOrders = Math.max(1, ...(orderHistory?.daily.map((day) => day.completed_orders) ?? [0]))
 
