@@ -169,15 +169,35 @@ export type AdminOrderDetail = {
 export type AdminRiderListItem = {
   rider_uid: number
   display_name: string
+  email_address: string | null
   mobile_no: string | null
   vehicle_type: string | null
+  status_cd: string
   availability_status: string
+  service_zone_codes: string[]
+  google_linked: boolean
   latitude: number | null
   longitude: number | null
   location_updated_at: string | null
   active_order_no: number | null
   active_order_status: string | null
   pending_payout_amount: string
+}
+
+export type AdminRiderProfile = {
+  rider_uid: number
+  user_id: number
+  display_name: string
+  email_address: string | null
+  mobile_no: string | null
+  vehicle_type: string | null
+  status_cd: string
+  availability_status: string
+  default_payout_amount: string
+  latitude: number | null
+  longitude: number | null
+  location_updated_at: string | null
+  service_zone_codes: string[]
 }
 
 export type AdminRiderListResult = {
@@ -218,6 +238,13 @@ export type AdminProductMerchantAssignment = {
   merchant_name: string
   prep_time_minutes: number
   active_yn: string
+}
+
+export type AdminServiceZone = {
+  code: string
+  name: string
+  description: string | null
+  is_active: boolean
 }
 
 export type AdminMerchantPayoutSummary = {

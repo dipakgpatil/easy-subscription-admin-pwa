@@ -1207,6 +1207,333 @@ label {
   border: 0;
 }
 
+.rider-management-view {
+  display: grid;
+  gap: 1rem;
+}
+
+.rider-onboarding-panel,
+.rider-roster-panel {
+  border-radius: 8px;
+}
+
+.rider-summary,
+.rider-roster-tools,
+.rider-contact-line,
+.rider-operation-details,
+.rider-name-line,
+.rider-card-footer,
+.rider-form-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.rider-summary {
+  gap: 0.5rem;
+}
+
+.rider-summary span,
+.rider-zone-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2rem;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.rider-onboarding-form {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.rider-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.rider-onboarding-form input,
+.rider-onboarding-form select,
+.rider-search-field input {
+  min-height: 46px;
+  border-radius: 7px;
+}
+
+.input-with-icon,
+.rider-search-field {
+  position: relative;
+}
+
+.input-with-icon > svg,
+.rider-search-field > svg {
+  position: absolute;
+  left: 0.85rem;
+  top: 50%;
+  z-index: 1;
+  color: var(--ink-soft);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.input-with-icon input,
+.rider-search-field input {
+  padding-left: 2.5rem;
+}
+
+.rider-zone-fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+
+.rider-zone-fieldset legend {
+  padding: 0 0.35rem;
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.rider-zone-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.rider-zone-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 40px;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.64);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.rider-zone-option:has(input:checked) {
+  border-color: rgba(18, 166, 109, 0.42);
+  background: rgba(18, 166, 109, 0.09);
+}
+
+.rider-zone-option input {
+  width: 1rem;
+  min-height: 1rem;
+  height: 1rem;
+  margin: 0;
+}
+
+.rider-form-actions {
+  justify-content: flex-end;
+}
+
+.rider-command-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 42px;
+  border-radius: 7px;
+}
+
+.rider-feedback {
+  margin-top: 1rem;
+  border-radius: 7px;
+}
+
+.rider-roster-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.rider-roster-tools {
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.rider-search-field {
+  width: min(380px, 68vw);
+}
+
+.rider-icon-button {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border-radius: 7px;
+}
+
+.rider-roster-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.rider-roster-card {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.35fr) minmax(210px, 0.8fr);
+  gap: 0.8rem 1.25rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.rider-identity {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: center;
+  min-width: 0;
+}
+
+.rider-avatar {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--forest);
+  color: white;
+  font-weight: 800;
+}
+
+.rider-name-line {
+  gap: 0.45rem;
+}
+
+.rider-name-line strong {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.rider-contact-line,
+.rider-operation-details {
+  gap: 0.4rem 0.85rem;
+  margin-top: 0.45rem;
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+}
+
+.rider-contact-line span,
+.rider-operation-details span,
+.rider-google-linked,
+.rider-google-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.rider-operation-details {
+  align-content: center;
+  justify-content: flex-end;
+  margin-top: 0;
+}
+
+.rider-google-linked {
+  color: #087348;
+}
+
+.rider-google-pending {
+  color: #946015;
+}
+
+.rider-zone-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  grid-column: 1 / -1;
+}
+
+.rider-zone-row span {
+  min-height: 1.7rem;
+  padding: 0.22rem 0.5rem;
+  font-size: 0.72rem;
+}
+
+.rider-card-footer {
+  grid-column: 1 / -1;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--line);
+}
+
+.rider-location-link,
+.rider-card-footer .muted-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+}
+
+.rider-location-link:hover {
+  color: var(--primary-dark);
+}
+
+.rider-empty-state {
+  display: grid;
+  place-items: center;
+  gap: 0.35rem;
+  min-height: 180px;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .rider-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rider-roster-card {
+    grid-template-columns: 1fr;
+  }
+
+  .rider-operation-details {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 620px) {
+  .rider-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rider-roster-toolbar,
+  .rider-card-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .rider-roster-tools,
+  .rider-search-field,
+  .rider-command-button {
+    width: 100%;
+  }
+
+  .rider-icon-button {
+    width: 46px;
+    flex: 0 0 46px;
+  }
+}
+
 @media (max-width: 1200px) {
   .overview-grid,
   .split-layout,

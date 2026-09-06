@@ -25,6 +25,7 @@ import './App.css'
 import ObservabilityView from './features/observability/ObservabilityView'
 import DispatchView from './features/dispatch/DispatchView'
 import AdministratorsView from './features/administrators/AdministratorsView'
+import RidersView from './features/riders/RidersView'
 import {
   ApiError,
   assignProductToMerchant,
@@ -44,6 +45,7 @@ import {
   getReferralConfig,
   getReferralList,
   getRiders,
+  listServiceZones,
   loginAdminWithMockGoogleProfile,
   markMerchantPayoutPaid,
   requestAdminOtp,
@@ -79,6 +81,7 @@ import type {
   AdminRiderListResult,
   AdminSession,
   AdminProductMerchantAssignment,
+  AdminServiceZone,
   AdminWalletCreditResponse,
 } from './lib/types'
 
@@ -298,6 +301,7 @@ function App() {
   const [selectedOrderNo, setSelectedOrderNo] = useState<number | null>(null)
   const [selectedOrder, setSelectedOrder] = useState<AdminOrderDetail | null>(null)
   const [riders, setRiders] = useState<AdminRiderListResult | null>(null)
+  const [serviceZones, setServiceZones] = useState<AdminServiceZone[]>([])
   const [payouts, setPayouts] = useState<AdminMerchantPayoutSummaryResult | null>(null)
   const [referralConfig, setReferralConfig] = useState<AdminReferralConfig | null>(null)
   const [referralAnalytics, setReferralAnalytics] = useState<AdminReferralAnalytics | null>(null)
@@ -459,8 +463,12 @@ function App() {
     if (!session) {
       return
     }
-    const payload = await getRiders(session.access_token)
+    const [payload, zones] = await Promise.all([
+      getRiders(session.access_token),
+      listServiceZones(),
+    ])
     setRiders(payload)
+    setServiceZones(zones)
   }, [session])
 
   const loadPayouts = useCallback(async () => {
@@ -1820,45 +1828,12 @@ function App() {
         ) : null}
 
         {activeTab === 'riders' ? (
-          <section className="panel">
-            <div className="panel-head">
-              <div>
-                <p className="section-kicker">Riders</p>
-                <h2>Live fleet visibility</h2>
-              </div>
-            </div>
-            <div className="rider-grid">
-              {(riders?.items ?? []).map((rider) => (
-                <article key={rider.rider_uid} className="rider-card">
-                  <div className="list-card-top">
-                    <div>
-                      <strong>{rider.display_name}</strong>
-                      <span>{rider.vehicle_type ?? 'Vehicle not set'}</span>
-                    </div>
-                    <span className={`badge ${badgeTone(rider.availability_status)}`}>{rider.availability_status}</span>
-                  </div>
-                  <p>{rider.mobile_no ?? 'No mobile number saved'}</p>
-                  <div className="meta-row">
-                    <span>{rider.active_order_no ? `On order #${rider.active_order_no}` : 'No active order'}</span>
-                    <span>{formatMoney(rider.pending_payout_amount)} pending</span>
-                  </div>
-                  <small>{formatDateTime(rider.location_updated_at)}</small>
-                  {rider.latitude !== null && rider.longitude !== null ? (
-                    <a
-                      className="maps-link"
-                      href={`https://maps.google.com/?q=${rider.latitude},${rider.longitude}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Open current location
-                    </a>
-                  ) : (
-                    <span className="muted-line">Location not reported yet</span>
-                  )}
-                </article>
-              ))}
-            </div>
-          </section>
+          <RidersView
+            token={session.access_token}
+            riders={riders}
+            serviceZones={serviceZones}
+            onRefresh={loadRiders}
+          />
         ) : null}
 
         {activeTab === 'payouts' ? (

@@ -16,8 +16,10 @@ import type {
   AdminReferralConfig,
   AdminReferralListResult,
   AdminRiderListResult,
+  AdminRiderProfile,
   AdminSession,
   AdminProductMerchantAssignment,
+  AdminServiceZone,
   AdminAdministrator,
   AdminAdministratorResult,
   AdminWalletCreditResponse,
@@ -633,6 +635,49 @@ export async function updateOrderStatus(
 
 export async function getRiders(token: string, liveOnly = false): Promise<AdminRiderListResult> {
   return request<AdminRiderListResult>(liveOnly ? '/admin/riders/live' : '/admin/riders', { token })
+}
+
+export async function listServiceZones(): Promise<AdminServiceZone[]> {
+  return request<AdminServiceZone[]>('/service-zones')
+}
+
+export async function provisionRider(
+  token: string,
+  payload: {
+    emailAddress: string
+    firstName: string
+    lastName?: string
+    mobileNo?: string
+    vehicleType: string
+    defaultPayoutAmount: string
+    serviceZoneCodes: string[]
+  },
+): Promise<AdminRiderProfile> {
+  return request<AdminRiderProfile>('/admin/riders', {
+    method: 'POST',
+    token,
+    body: {
+      email_address: payload.emailAddress.trim().toLowerCase(),
+      first_name: payload.firstName.trim(),
+      last_name: payload.lastName?.trim() || undefined,
+      mobile_no: payload.mobileNo?.trim() || undefined,
+      vehicle_type: payload.vehicleType,
+      default_payout_amount: payload.defaultPayoutAmount,
+      serviceZoneCodes: payload.serviceZoneCodes,
+    },
+  })
+}
+
+export async function updateRiderStatus(
+  token: string,
+  riderUid: number,
+  status: 'ACTIVE' | 'SUSPENDED',
+): Promise<AdminRiderProfile> {
+  return request<AdminRiderProfile>(`/admin/riders/${encodeURIComponent(String(riderUid))}/status`, {
+    method: 'PUT',
+    token,
+    body: { statusCd: status },
+  })
 }
 
 export async function getMerchantPayouts(
