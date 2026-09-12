@@ -1,4 +1,5 @@
 import { startTransition, useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
+import type { ChangeEvent } from 'react'
 import {
   Bike,
   ChefHat,
@@ -26,10 +27,13 @@ import ObservabilityView from './features/observability/ObservabilityView'
 import DispatchView from './features/dispatch/DispatchView'
 import AdministratorsView from './features/administrators/AdministratorsView'
 import RidersView from './features/riders/RidersView'
+import ComplianceView from './features/compliance/ComplianceView'
 import {
   ApiError,
+  approveProductSubmission,
   assignProductToMerchant,
   appConfig,
+  bulkAssignProductsToMerchant,
   completeAdminGoogleRedirectLogin,
   connectAdminOrderStream,
   createCatalogProduct,
@@ -45,14 +49,19 @@ import {
   getReferralConfig,
   getReferralList,
   getRiders,
+  listProductSubmissions,
   listServiceZones,
   loginAdminWithMockGoogleProfile,
   markMerchantPayoutPaid,
+  provisionMerchant,
+  rejectProductSubmission,
   requestAdminOtp,
   runReferralTest,
   searchOrders,
+  setMerchantCoverageZones,
   updateOrderStatus,
   updateReferralConfig,
+  uploadProductImage,
   verifyAdminOtp,
 } from './lib/api'
 import {
@@ -81,11 +90,12 @@ import type {
   AdminRiderListResult,
   AdminSession,
   AdminProductMerchantAssignment,
+  AdminProductSubmission,
   AdminServiceZone,
   AdminWalletCreditResponse,
 } from './lib/types'
 
-type ViewTab = 'overview' | 'catalog' | 'orders' | 'history' | 'riders' | 'payouts' | 'referrals' | 'dispatch' | 'errors' | 'security' | 'administrators'
+type ViewTab = 'overview' | 'catalog' | 'orders' | 'history' | 'riders' | 'compliance' | 'payouts' | 'referrals' | 'dispatch' | 'errors' | 'security' | 'administrators'
 type LoginMode = 'google' | 'otp'
 
 type CatalogProductDraft = {
@@ -104,6 +114,32 @@ const EMPTY_CATALOG_PRODUCT: CatalogProductDraft = {
   price: '',
   imageUrl: '',
   description: '',
+}
+
+type MerchantDraft = {
+  emailAddress: string
+  firstName: string
+  lastName: string
+  mobileNo: string
+  displayName: string
+  fssaiRegistrationNo: string
+  pickupGroupCode: string
+  kitchenType: 'IN_HOUSE' | 'VENDOR'
+  locationLabel: string
+  defaultPrepMinutes: string
+}
+
+const EMPTY_MERCHANT_DRAFT: MerchantDraft = {
+  emailAddress: '',
+  firstName: '',
+  lastName: '',
+  mobileNo: '',
+  displayName: '',
+  fssaiRegistrationNo: '',
+  pickupGroupCode: '',
+  kitchenType: 'IN_HOUSE',
+  locationLabel: '',
+  defaultPrepMinutes: '15',
 }
 
 const ORDER_ACTIONS = ['ACCEPTED', 'PREPARING', 'READY', 'ASSIGNED', 'IN_TRANSIT', 'COMPLETED'] as const
@@ -281,7 +317,7 @@ function App() {
   const [session, setSession] = useState<AdminSession | null>(() => readSession())
   const [activeTab, setActiveTab] = useState<ViewTab>(() => {
     const stored = readActiveTab()
-    if (stored === 'overview' || stored === 'catalog' || stored === 'orders' || stored === 'history' || stored === 'riders' || stored === 'payouts' || stored === 'referrals' || stored === 'dispatch' || stored === 'errors' || stored === 'security' || stored === 'administrators') {
+    if (stored === 'overview' || stored === 'catalog' || stored === 'orders' || stored === 'history' || stored === 'riders' || stored === 'compliance' || stored === 'payouts' || stored === 'referrals' || stored === 'dispatch' || stored === 'errors' || stored === 'security' || stored === 'administrators') {
       return stored
     }
     return 'overview'
@@ -292,16 +328,24 @@ function App() {
   const [orderHistory, setOrderHistory] = useState<AdminOrderHistory | null>(null)
   const [catalogMerchants, setCatalogMerchants] = useState<AdminMerchantProfile[]>([])
   const [catalogAssignments, setCatalogAssignments] = useState<AdminProductMerchantAssignment[]>([])
+  const [serviceZones, setServiceZones] = useState<AdminServiceZone[]>([])
+  const [productSubmissions, setProductSubmissions] = useState<AdminProductSubmission[]>([])
   const [catalogProduct, setCatalogProduct] = useState<CatalogProductDraft>(EMPTY_CATALOG_PRODUCT)
   const [assignmentProductCode, setAssignmentProductCode] = useState('')
   const [assignmentMerchantUid, setAssignmentMerchantUid] = useState('')
   const [assignmentPrepMinutes, setAssignmentPrepMinutes] = useState('15')
+  const [assignmentPriceOverride, setAssignmentPriceOverride] = useState('')
+  const [merchantDraft, setMerchantDraft] = useState<MerchantDraft>(EMPTY_MERCHANT_DRAFT)
+  const [coverageZoneMerchantUid, setCoverageZoneMerchantUid] = useState('')
+  const [selectedZoneCodes, setSelectedZoneCodes] = useState<string[]>([])
+  const [bulkAssignMerchantUid, setBulkAssignMerchantUid] = useState('')
+  const [bulkProductCodesText, setBulkProductCodesText] = useState('')
+  const [bulkPrepMinutes, setBulkPrepMinutes] = useState('15')
   const [catalogResult, setCatalogResult] = useState<string | null>(null)
   const [orders, setOrders] = useState<AdminOrderSearchResult | null>(null)
   const [selectedOrderNo, setSelectedOrderNo] = useState<number | null>(null)
   const [selectedOrder, setSelectedOrder] = useState<AdminOrderDetail | null>(null)
   const [riders, setRiders] = useState<AdminRiderListResult | null>(null)
-  const [serviceZones, setServiceZones] = useState<AdminServiceZone[]>([])
   const [payouts, setPayouts] = useState<AdminMerchantPayoutSummaryResult | null>(null)
   const [referralConfig, setReferralConfig] = useState<AdminReferralConfig | null>(null)
   const [referralAnalytics, setReferralAnalytics] = useState<AdminReferralAnalytics | null>(null)
@@ -442,13 +486,19 @@ function App() {
     if (!session) {
       return
     }
-    const [merchants, assignments] = await Promise.all([
+    const [merchants, assignments, zones, submissions] = await Promise.all([
       getProvisionedMerchants(session.access_token),
       getProductMerchantAssignments(session.access_token),
+      listServiceZones(),
+      listProductSubmissions(session.access_token),
     ])
     setCatalogMerchants(merchants)
     setCatalogAssignments(assignments)
+    setServiceZones(zones)
+    setProductSubmissions(submissions)
     setAssignmentMerchantUid((current) => current || String(merchants[0]?.merchant_uid ?? ''))
+    setBulkAssignMerchantUid((current) => current || String(merchants[0]?.merchant_uid ?? ''))
+    setCoverageZoneMerchantUid((current) => current || String(merchants[0]?.merchant_uid ?? ''))
   }, [session])
 
   const loadSelectedOrder = useCallback(async () => {
@@ -639,6 +689,29 @@ function App() {
     return () => window.clearInterval(intervalId)
   }, [activeTab, refreshActiveView, session])
 
+  async function handleProductImageFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || !session) {
+      return
+    }
+    const productCode = catalogProduct.productCode.trim().toUpperCase()
+    if (!productCode) {
+      setLastError('Enter the product code before choosing an image.')
+      return
+    }
+    setLoadingKey('catalog-image-upload')
+    setLastError(null)
+    try {
+      const uploaded = await uploadProductImage(session.access_token, { productCode, file })
+      setCatalogProduct((current) => ({ ...current, imageUrl: uploaded.url }))
+    } catch (error) {
+      setLastError(getErrorMessage(error))
+    } finally {
+      setLoadingKey(null)
+    }
+  }
+
   async function handleCreateCatalogProduct() {
     if (!session) {
       return
@@ -691,10 +764,168 @@ function App() {
       const assignment = await assignProductToMerchant(session.access_token, productCode, {
         merchantUid,
         prepTimeMinutes,
+        priceOverride: assignmentPriceOverride.trim() || undefined,
       })
       await loadCatalogSetup()
       setCatalogResult(`${assignment.product_code} is active for ${assignment.merchant_name}.`)
       setAssignmentProductCode('')
+      setAssignmentPriceOverride('')
+    } catch (error) {
+      setLastError(getErrorMessage(error))
+    } finally {
+      setLoadingKey(null)
+    }
+  }
+
+  async function handleProvisionMerchant() {
+    if (!session) {
+      return
+    }
+    const emailAddress = merchantDraft.emailAddress.trim()
+    const firstName = merchantDraft.firstName.trim()
+    const displayName = merchantDraft.displayName.trim()
+    const fssaiRegistrationNo = merchantDraft.fssaiRegistrationNo.trim()
+    const defaultPrepMinutes = Number.parseInt(merchantDraft.defaultPrepMinutes, 10)
+    if (!emailAddress || !firstName || !displayName || !/^[0-9]{14}$/.test(fssaiRegistrationNo) || !Number.isFinite(defaultPrepMinutes)) {
+      setLastError('Merchant email, first name, display name, a 14-digit FSSAI number, and default prep time are required.')
+      return
+    }
+    setLoadingKey('provision-merchant')
+    setLastError(null)
+    setCatalogResult(null)
+    try {
+      const merchant = await provisionMerchant(session.access_token, {
+        emailAddress,
+        firstName,
+        lastName: merchantDraft.lastName.trim(),
+        mobileNo: merchantDraft.mobileNo.trim(),
+        displayName,
+        fssaiRegistrationNo,
+        pickupGroupCode: merchantDraft.pickupGroupCode.trim(),
+        kitchenType: merchantDraft.kitchenType,
+        locationLabel: merchantDraft.locationLabel.trim(),
+        defaultPrepMinutes,
+      })
+      await loadCatalogSetup()
+      setCatalogResult(`${merchant.display_name} is provisioned. Set its coverage zones, then assign products.`)
+      setMerchantDraft(EMPTY_MERCHANT_DRAFT)
+    } catch (error) {
+      setLastError(getErrorMessage(error))
+    } finally {
+      setLoadingKey(null)
+    }
+  }
+
+  function handleCoverageZoneMerchantChange(merchantUidValue: string) {
+    setCoverageZoneMerchantUid(merchantUidValue)
+    const merchant = catalogMerchants.find((entry) => String(entry.merchant_uid) === merchantUidValue)
+    setSelectedZoneCodes(merchant?.coverage_zone_codes ?? [])
+  }
+
+  function toggleSelectedZoneCode(zoneCode: string) {
+    setSelectedZoneCodes((current) =>
+      current.includes(zoneCode) ? current.filter((code) => code !== zoneCode) : [...current, zoneCode],
+    )
+  }
+
+  async function handleSetCoverageZones() {
+    if (!session) {
+      return
+    }
+    const merchantUid = Number.parseInt(coverageZoneMerchantUid, 10)
+    if (!Number.isFinite(merchantUid)) {
+      setLastError('Select a merchant before saving coverage zones.')
+      return
+    }
+    setLoadingKey('coverage-zones')
+    setLastError(null)
+    setCatalogResult(null)
+    try {
+      const merchant = await setMerchantCoverageZones(session.access_token, merchantUid, selectedZoneCodes)
+      await loadCatalogSetup()
+      setCatalogResult(
+        merchant.coverage_zone_codes.length > 0
+          ? `${merchant.display_name} now covers: ${merchant.coverage_zone_codes.join(', ')}.`
+          : `${merchant.display_name} has no coverage zones, so it is invisible to customers.`,
+      )
+    } catch (error) {
+      setLastError(getErrorMessage(error))
+    } finally {
+      setLoadingKey(null)
+    }
+  }
+
+  async function handleBulkAssignProducts() {
+    if (!session) {
+      return
+    }
+    const merchantUid = Number.parseInt(bulkAssignMerchantUid, 10)
+    const prepTimeMinutes = Number.parseInt(bulkPrepMinutes, 10)
+    const productCodes = bulkProductCodesText
+      .split(/[\n,]/)
+      .map((code) => code.trim().toUpperCase())
+      .filter((code) => code.length > 0)
+    if (!Number.isFinite(merchantUid) || productCodes.length === 0 || !Number.isFinite(prepTimeMinutes) || prepTimeMinutes < 1 || prepTimeMinutes > 180) {
+      setLastError('Merchant, at least one product code, and prep time from 1 to 180 minutes are required.')
+      return
+    }
+    setLoadingKey('bulk-assign')
+    setLastError(null)
+    setCatalogResult(null)
+    try {
+      const assignments = await bulkAssignProductsToMerchant(session.access_token, {
+        merchantUid,
+        productCodes,
+        prepTimeMinutes,
+      })
+      await loadCatalogSetup()
+      setCatalogResult(`${assignments.length} product(s) assigned to ${assignments[0]?.merchant_name ?? 'the merchant'}.`)
+      setBulkProductCodesText('')
+    } catch (error) {
+      setLastError(getErrorMessage(error))
+    } finally {
+      setLoadingKey(null)
+    }
+  }
+
+  async function handleApproveSubmission(
+    productCode: string,
+    overrides: {
+      productDes?: string
+      categoryDes?: string
+      price?: string
+      prepTimeMinutes?: number
+      imageUrl?: string
+    },
+  ) {
+    if (!session) {
+      return
+    }
+    setLoadingKey(`submission-${productCode}`)
+    setLastError(null)
+    setCatalogResult(null)
+    try {
+      const result = await approveProductSubmission(session.access_token, productCode, overrides)
+      await loadCatalogSetup()
+      setCatalogResult(`${result.product_code} is published and assigned to ${result.merchant_name}.`)
+    } catch (error) {
+      setLastError(getErrorMessage(error))
+    } finally {
+      setLoadingKey(null)
+    }
+  }
+
+  async function handleRejectSubmission(productCode: string, reason: string) {
+    if (!session) {
+      return
+    }
+    setLoadingKey(`submission-${productCode}`)
+    setLastError(null)
+    setCatalogResult(null)
+    try {
+      const result = await rejectProductSubmission(session.access_token, productCode, reason)
+      await loadCatalogSetup()
+      setCatalogResult(`${result.product_code} was rejected.`)
     } catch (error) {
       setLastError(getErrorMessage(error))
     } finally {
@@ -1117,6 +1348,7 @@ function App() {
             ['orders', 'Orders'],
             ['history', 'History'],
             ['riders', 'Riders'],
+            ['compliance', 'Compliance'],
             ['payouts', 'Payouts'],
             ['referrals', 'Referrals'],
             ['dispatch', 'Dispatch'],
@@ -1158,6 +1390,7 @@ function App() {
               {activeTab === 'orders' && (selectedOrder ? `Order #${selectedOrder.order_no}` : 'Order search and intervention')}
               {activeTab === 'history' && 'Completed order history'}
               {activeTab === 'riders' && 'Rider live operations'}
+              {activeTab === 'compliance' && 'Partner compliance'}
               {activeTab === 'payouts' && 'Merchant payout desk'}
               {activeTab === 'referrals' && 'Referral campaign desk'}
               {activeTab === 'dispatch' && 'Delivery dispatch watch'}
@@ -1440,8 +1673,117 @@ function App() {
           <AdministratorsView token={session.access_token} />
         ) : null}
 
+        {activeTab === 'compliance' ? (
+          <ComplianceView token={session.access_token} />
+        ) : null}
+
         {activeTab === 'catalog' ? (
           <section className="catalog-setup-grid">
+            <section className="panel">
+              <div className="panel-head compact">
+                <div>
+                  <p className="section-kicker">Merchant</p>
+                  <h2>Provision a merchant</h2>
+                </div>
+              </div>
+              <form className="catalog-form" onSubmit={(event) => { event.preventDefault(); void handleProvisionMerchant() }}>
+                <label>
+                  Gmail address
+                  <input value={merchantDraft.emailAddress} onChange={(event) => setMerchantDraft((current) => ({ ...current, emailAddress: event.target.value }))} placeholder="merchant.house@gmail.com" />
+                </label>
+                <div className="inline-grid">
+                  <label>
+                    First name
+                    <input value={merchantDraft.firstName} onChange={(event) => setMerchantDraft((current) => ({ ...current, firstName: event.target.value }))} placeholder="Easy" />
+                  </label>
+                  <label>
+                    Last name
+                    <input value={merchantDraft.lastName} onChange={(event) => setMerchantDraft((current) => ({ ...current, lastName: event.target.value }))} placeholder="Kitchen" />
+                  </label>
+                </div>
+                <label>
+                  Display name
+                  <input value={merchantDraft.displayName} onChange={(event) => setMerchantDraft((current) => ({ ...current, displayName: event.target.value }))} placeholder="Easy Kitchen House" maxLength={160} />
+                </label>
+                <label>
+                  FSSAI registration or licence number
+                  <input value={merchantDraft.fssaiRegistrationNo} onChange={(event) => setMerchantDraft((current) => ({ ...current, fssaiRegistrationNo: event.target.value.replace(/\D/g, '').slice(0, 14) }))} placeholder="12345678901234" inputMode="numeric" pattern="[0-9]{14}" maxLength={14} required />
+                </label>
+                <div className="inline-grid">
+                  <label>
+                    Mobile number
+                    <input value={merchantDraft.mobileNo} onChange={(event) => setMerchantDraft((current) => ({ ...current, mobileNo: event.target.value }))} placeholder="9000000011" />
+                  </label>
+                  <label>
+                    Kitchen type
+                    <select value={merchantDraft.kitchenType} onChange={(event) => setMerchantDraft((current) => ({ ...current, kitchenType: event.target.value as 'IN_HOUSE' | 'VENDOR' }))}>
+                      <option value="IN_HOUSE">In-house</option>
+                      <option value="VENDOR">Vendor</option>
+                    </select>
+                  </label>
+                </div>
+                <label>
+                  Location label
+                  <input value={merchantDraft.locationLabel} onChange={(event) => setMerchantDraft((current) => ({ ...current, locationLabel: event.target.value }))} placeholder="Central Kitchen" />
+                </label>
+                <div className="inline-grid">
+                  <label>
+                    Pickup group code
+                    <input value={merchantDraft.pickupGroupCode} onChange={(event) => setMerchantDraft((current) => ({ ...current, pickupGroupCode: event.target.value }))} placeholder="MAGARPATTA_CLUSTER_A" />
+                  </label>
+                  <label>
+                    Default prep time (minutes)
+                    <input value={merchantDraft.defaultPrepMinutes} onChange={(event) => setMerchantDraft((current) => ({ ...current, defaultPrepMinutes: event.target.value }))} type="number" min="1" max="180" />
+                  </label>
+                </div>
+                <button className="primary-button" type="submit" disabled={loadingKey === 'provision-merchant'}>
+                  {loadingKey === 'provision-merchant' ? 'Provisioning...' : 'Provision merchant'}
+                </button>
+              </form>
+            </section>
+
+            <section className="panel">
+              <div className="panel-head compact">
+                <div>
+                  <p className="section-kicker">Merchant</p>
+                  <h2>Set delivery coverage zones</h2>
+                </div>
+              </div>
+              <form className="catalog-form" onSubmit={(event) => { event.preventDefault(); void handleSetCoverageZones() }}>
+                <label>
+                  Merchant
+                  <select value={coverageZoneMerchantUid} onChange={(event) => handleCoverageZoneMerchantChange(event.target.value)}>
+                    <option value="">Select merchant</option>
+                    {catalogMerchants.map((merchant) => (
+                      <option key={merchant.merchant_uid} value={merchant.merchant_uid}>
+                        {merchant.display_name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="zone-checklist">
+                  {serviceZones.length === 0 ? (
+                    <p className="muted-line">No service zones exist yet.</p>
+                  ) : (
+                    serviceZones.map((zone) => (
+                      <label key={zone.code} className="zone-checklist-item">
+                        <input
+                          type="checkbox"
+                          checked={selectedZoneCodes.includes(zone.code)}
+                          onChange={() => toggleSelectedZoneCode(zone.code)}
+                        />
+                        {zone.name}
+                      </label>
+                    ))
+                  )}
+                </div>
+                <p className="muted-line">A merchant is invisible to customers until it covers at least one zone.</p>
+                <button className="primary-button" type="submit" disabled={loadingKey === 'coverage-zones' || !coverageZoneMerchantUid}>
+                  {loadingKey === 'coverage-zones' ? 'Saving...' : 'Save coverage zones'}
+                </button>
+              </form>
+            </section>
+
             <section className="panel">
               <div className="panel-head compact">
                 <div>
@@ -1469,9 +1811,18 @@ function App() {
                   <input value={catalogProduct.categoryName} onChange={(event) => setCatalogProduct((current) => ({ ...current, categoryName: event.target.value }))} placeholder="Rice bowls" maxLength={120} />
                 </label>
                 <label>
-                  Image URL
-                  <input value={catalogProduct.imageUrl} onChange={(event) => setCatalogProduct((current) => ({ ...current, imageUrl: event.target.value }))} type="url" placeholder="https://..." />
+                  Product image
+                  <input type="file" accept="image/*" onChange={(event) => { void handleProductImageFileChange(event) }} disabled={loadingKey === 'catalog-image-upload'} />
                 </label>
+                {loadingKey === 'catalog-image-upload' ? <p className="muted-line">Uploading image...</p> : null}
+                {catalogProduct.imageUrl ? (
+                  <div className="catalog-image-preview">
+                    <img src={catalogProduct.imageUrl} alt="Product preview" />
+                    <button type="button" className="link-button" onClick={() => setCatalogProduct((current) => ({ ...current, imageUrl: '' }))}>
+                      Remove image
+                    </button>
+                  </div>
+                ) : null}
                 <label>
                   Description
                   <textarea value={catalogProduct.description} onChange={(event) => setCatalogProduct((current) => ({ ...current, description: event.target.value }))} rows={3} placeholder="Ingredients, portion, and customer-facing details" />
@@ -1505,14 +1856,77 @@ function App() {
                     ))}
                   </select>
                 </label>
-                <label>
-                  Preparation time (minutes)
-                  <input value={assignmentPrepMinutes} onChange={(event) => setAssignmentPrepMinutes(event.target.value)} type="number" min="1" max="180" />
-                </label>
+                <div className="inline-grid">
+                  <label>
+                    Preparation time (minutes)
+                    <input value={assignmentPrepMinutes} onChange={(event) => setAssignmentPrepMinutes(event.target.value)} type="number" min="1" max="180" />
+                  </label>
+                  <label>
+                    Price override (optional)
+                    <input value={assignmentPriceOverride} onChange={(event) => setAssignmentPriceOverride(event.target.value)} type="number" min="0" step="0.01" placeholder="Leave blank to use the catalog price" />
+                  </label>
+                </div>
                 <button className="primary-button" type="submit" disabled={loadingKey === 'catalog-assignment' || catalogMerchants.length === 0}>
                   {loadingKey === 'catalog-assignment' ? 'Assigning...' : 'Assign and activate'}
                 </button>
               </form>
+            </section>
+
+            <section className="panel">
+              <div className="panel-head compact">
+                <div>
+                  <p className="section-kicker">Fast launch</p>
+                  <h2>Assign several products at once</h2>
+                </div>
+              </div>
+              <form className="catalog-form" onSubmit={(event) => { event.preventDefault(); void handleBulkAssignProducts() }}>
+                <label>
+                  Merchant
+                  <select value={bulkAssignMerchantUid} onChange={(event) => setBulkAssignMerchantUid(event.target.value)}>
+                    <option value="">Select merchant</option>
+                    {catalogMerchants.map((merchant) => (
+                      <option key={merchant.merchant_uid} value={merchant.merchant_uid}>
+                        {merchant.display_name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Product codes (one per line, for the merchant's starter catalog)
+                  <textarea value={bulkProductCodesText} onChange={(event) => setBulkProductCodesText(event.target.value)} rows={4} placeholder={'POHA01\nMISAL01\nUPMA01'} />
+                </label>
+                <label>
+                  Preparation time (minutes), applied to all
+                  <input value={bulkPrepMinutes} onChange={(event) => setBulkPrepMinutes(event.target.value)} type="number" min="1" max="180" />
+                </label>
+                <button className="primary-button" type="submit" disabled={loadingKey === 'bulk-assign' || catalogMerchants.length === 0}>
+                  {loadingKey === 'bulk-assign' ? 'Assigning...' : 'Assign all'}
+                </button>
+              </form>
+            </section>
+
+            <section className="panel catalog-assignment-panel">
+              <div className="panel-head compact">
+                <div>
+                  <p className="section-kicker">Review queue</p>
+                  <h2>Merchant product submissions ({productSubmissions.length})</h2>
+                </div>
+              </div>
+              {productSubmissions.length === 0 ? (
+                <EmptyState title="Nothing pending" body="Merchant-submitted products awaiting review will appear here." />
+              ) : (
+                <div className="submission-list">
+                  {productSubmissions.map((submission) => (
+                    <ProductSubmissionRow
+                      key={submission.product_code}
+                      submission={submission}
+                      busy={loadingKey === `submission-${submission.product_code}`}
+                      onApprove={(overrides) => handleApproveSubmission(submission.product_code, overrides)}
+                      onReject={(reason) => handleRejectSubmission(submission.product_code, reason)}
+                    />
+                  ))}
+                </div>
+              )}
             </section>
 
             {catalogResult ? <p className="success-banner">{catalogResult}</p> : null}
@@ -1531,6 +1945,7 @@ function App() {
                       <th>Product</th>
                       <th>Merchant</th>
                       <th>Prep time</th>
+                      <th>Price override</th>
                       <th>Status</th>
                     </tr>
                   </thead>
@@ -1540,6 +1955,7 @@ function App() {
                         <td><strong>{assignment.product_code}</strong></td>
                         <td>{assignment.merchant_name}</td>
                         <td>{assignment.prep_time_minutes} minutes</td>
+                        <td>{assignment.price_override ? formatMoney(assignment.price_override) : '—'}</td>
                         <td><span className={`badge ${assignment.active_yn === 'Y' ? 'is-positive' : 'is-neutral'}`}>{assignment.active_yn === 'Y' ? 'ACTIVE' : 'PAUSED'}</span></td>
                       </tr>
                     ))}
@@ -2304,6 +2720,114 @@ function EmptyState({ title, body }: { title: string; body: string }) {
     <div className="empty-state">
       <strong>{title}</strong>
       <p>{body}</p>
+    </div>
+  )
+}
+
+function ProductSubmissionRow({
+  submission,
+  busy,
+  onApprove,
+  onReject,
+}: {
+  submission: AdminProductSubmission
+  busy: boolean
+  onApprove: (overrides: {
+    productDes?: string
+    categoryDes?: string
+    price?: string
+    prepTimeMinutes?: number
+    imageUrl?: string
+  }) => void
+  onReject: (reason: string) => void
+}) {
+  const [productDes, setProductDes] = useState(submission.product_des)
+  const [categoryDes, setCategoryDes] = useState(submission.category_des ?? '')
+  const [price, setPrice] = useState(submission.price)
+  const [prepTimeMinutes, setPrepTimeMinutes] = useState(String(submission.prep_time_minutes ?? 15))
+  const [rejectReason, setRejectReason] = useState('')
+  const [showRejectField, setShowRejectField] = useState(false)
+
+  return (
+    <div className="submission-row">
+      <div className="submission-row-media">
+        {submission.image_url ? (
+          <img src={submission.image_url} alt={submission.product_des} />
+        ) : (
+          <div className="submission-row-media-placeholder">No image</div>
+        )}
+      </div>
+      <div className="submission-row-fields">
+        <div className="inline-grid">
+          <label>
+            Name
+            <input value={productDes} onChange={(event) => setProductDes(event.target.value)} />
+          </label>
+          <label>
+            Category
+            <input value={categoryDes} onChange={(event) => setCategoryDes(event.target.value)} />
+          </label>
+        </div>
+        <div className="inline-grid">
+          <label>
+            Price
+            <input value={price} onChange={(event) => setPrice(event.target.value)} type="number" min="0.01" step="0.01" />
+          </label>
+          <label>
+            Prep time (minutes)
+            <input value={prepTimeMinutes} onChange={(event) => setPrepTimeMinutes(event.target.value)} type="number" min="1" max="180" />
+          </label>
+        </div>
+        {submission.description ? <p className="muted-line">{submission.description}</p> : null}
+        <p className="muted-line">
+          Submitted by {submission.merchant_name} on {new Date(submission.submitted_at).toLocaleDateString()}
+        </p>
+        <div className="submission-row-actions">
+          <button
+            type="button"
+            className="primary-button"
+            disabled={busy}
+            onClick={() =>
+              onApprove({
+                productDes: productDes !== submission.product_des ? productDes : undefined,
+                categoryDes: categoryDes !== (submission.category_des ?? '') ? categoryDes : undefined,
+                price: price !== submission.price ? price : undefined,
+                prepTimeMinutes:
+                  Number(prepTimeMinutes) !== submission.prep_time_minutes
+                    ? Number.parseInt(prepTimeMinutes, 10)
+                    : undefined,
+              })
+            }
+          >
+            {busy ? 'Working...' : 'Approve and publish'}
+          </button>
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={busy}
+            onClick={() => setShowRejectField((current) => !current)}
+          >
+            Reject
+          </button>
+        </div>
+        {showRejectField ? (
+          <div className="submission-row-reject">
+            <input
+              value={rejectReason}
+              onChange={(event) => setRejectReason(event.target.value)}
+              placeholder="Reason (shown to the merchant)"
+            />
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={busy}
+              onClick={() => onReject(rejectReason)}
+            >
+              Confirm reject
+            </button>
+          </div>
+        ) : null}
+      </div>
     </div>
   )
 }

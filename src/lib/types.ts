@@ -209,6 +209,7 @@ export type AdminMerchantProfile = {
   merchant_uid: number
   user_id: number
   display_name: string
+  fssai_registration_no: string | null
   email_address: string | null
   mobile_no: string | null
   pickup_group_code: string | null
@@ -238,6 +239,7 @@ export type AdminProductMerchantAssignment = {
   merchant_name: string
   prep_time_minutes: number
   active_yn: string
+  price_override: string | null
 }
 
 export type AdminServiceZone = {
@@ -464,4 +466,38 @@ export type DispatchIncidentResult = {
   page: number
   pageSize: number
   items: DispatchIncident[]
+}
+
+export type AdminProductSubmission = {
+  product_code: string
+  product_des: string
+  category_des: string | null
+  price: string
+  description: string | null
+  prep_time_minutes: number | null
+  image_url: string | null
+  status_cd: string
+  rejection_reason: string | null
+  submitted_at: string
+  reviewed_at: string | null
+  merchant_uid: number
+  merchant_name: string
+}
+
+export type AdminPartnerComplianceItem = {
+  document_id: number
+  partner_type: 'RIDER' | 'MERCHANT'
+  partner_uid: number
+  partner_name: string
+  email_address: string | null
+  document_type: string
+  title: string
+  description: string
+  status_cd: 'MISSING' | 'SUBMITTED' | 'VERIFIED' | 'REJECTED'
+  required: boolean
+  due_at: string | null
+  submitted_at: string | null
+  reviewed_at: string | null
+  rejection_reason: string | null
+  overdue: boolean
 }

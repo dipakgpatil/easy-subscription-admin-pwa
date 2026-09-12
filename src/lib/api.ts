@@ -19,6 +19,8 @@ import type {
   AdminRiderProfile,
   AdminSession,
   AdminProductMerchantAssignment,
+  AdminProductSubmission,
+  AdminPartnerComplianceItem,
   AdminServiceZone,
   AdminAdministrator,
   AdminAdministratorResult,
@@ -578,10 +580,56 @@ export async function createCatalogProduct(
   })
 }
 
+export async function uploadProductImage(
+  token: string,
+  payload: { productCode: string; file: File },
+): Promise<{ url: string }> {
+  const form = new FormData()
+  form.append('product_code', payload.productCode)
+  form.append('file', payload.file)
+
+  let response: Response
+  try {
+    response = await fetch(`${API_BASE_URL}/admin/catalog/product-images`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+      credentials: 'same-origin',
+      signal: AbortSignal.timeout(30000),
+    })
+  } catch (error) {
+    const networkError = new ApiError(
+      error instanceof DOMException && error.name === 'TimeoutError'
+        ? 'The image upload timed out.'
+        : 'Unable to reach the API.',
+      0,
+    )
+    void reportAdminClientError('POST /admin/catalog/product-images', networkError, token)
+    throw networkError
+  }
+
+  const responsePayload = await response.json().catch(() => null)
+  if (!response.ok) {
+    const message =
+      typeof responsePayload === 'object' && responsePayload && 'error' in responsePayload
+        ? String((responsePayload as { error?: { message?: string } }).error?.message ?? 'Upload failed')
+        : `Upload failed with status ${response.status}`
+    const error = new ApiError(message, response.status, response.headers.get('x-request-id'))
+    void reportAdminClientError('POST /admin/catalog/product-images', error, token)
+    throw error
+  }
+  return responsePayload as { url: string }
+}
+
 export async function assignProductToMerchant(
   token: string,
   productCode: string,
-  payload: { merchantUid: number; prepTimeMinutes: number; activeYn?: 'Y' | 'N' },
+  payload: {
+    merchantUid: number
+    prepTimeMinutes: number
+    activeYn?: 'Y' | 'N'
+    priceOverride?: string
+  },
 ): Promise<AdminProductMerchantAssignment> {
   return request<AdminProductMerchantAssignment>(
     `/admin/merchants/products/${encodeURIComponent(productCode.toUpperCase())}`,
@@ -592,7 +640,129 @@ export async function assignProductToMerchant(
         merchant_uid: payload.merchantUid,
         prep_time_minutes: payload.prepTimeMinutes,
         active_yn: payload.activeYn ?? 'Y',
+        price_override: payload.priceOverride || undefined,
       },
+    },
+  )
+}
+
+export async function bulkAssignProductsToMerchant(
+  token: string,
+  payload: { merchantUid: number; productCodes: string[]; prepTimeMinutes: number },
+): Promise<AdminProductMerchantAssignment[]> {
+  return request<AdminProductMerchantAssignment[]>('/admin/merchants/products/bulk-assign', {
+    method: 'POST',
+    token,
+    body: {
+      merchant_uid: payload.merchantUid,
+      assignments: payload.productCodes.map((productCode) => ({
+        product_code: productCode.toUpperCase(),
+        prep_time_minutes: payload.prepTimeMinutes,
+      })),
+    },
+  })
+}
+
+export async function provisionMerchant(
+  token: string,
+  payload: {
+    emailAddress: string
+    firstName: string
+    lastName?: string
+    mobileNo?: string
+    displayName: string
+    fssaiRegistrationNo: string
+    pickupGroupCode?: string
+    kitchenType: 'IN_HOUSE' | 'VENDOR'
+    locationLabel?: string
+    defaultPrepMinutes: number
+  },
+): Promise<AdminMerchantProfile> {
+  return request<AdminMerchantProfile>('/admin/merchants', {
+    method: 'POST',
+    token,
+    body: {
+      email_address: payload.emailAddress,
+      first_name: payload.firstName,
+      last_name: payload.lastName || undefined,
+      mobile_no: payload.mobileNo || undefined,
+      display_name: payload.displayName,
+      fssai_registration_no: payload.fssaiRegistrationNo,
+      pickup_group_code: payload.pickupGroupCode || undefined,
+      kitchen_type: payload.kitchenType,
+      location_label: payload.locationLabel || undefined,
+      default_prep_minutes: payload.defaultPrepMinutes,
+    },
+  })
+}
+
+export async function setMerchantCoverageZones(
+  token: string,
+  merchantUid: number,
+  zoneCodes: string[],
+): Promise<AdminMerchantProfile> {
+  return request<AdminMerchantProfile>(
+    `/admin/merchants/${encodeURIComponent(String(merchantUid))}/coverage-zones`,
+    {
+      method: 'PUT',
+      token,
+      body: { zone_codes: zoneCodes },
+    },
+  )
+}
+
+export async function listServiceZones(): Promise<AdminServiceZone[]> {
+  return request<AdminServiceZone[]>('/service-zones')
+}
+
+export async function listProductSubmissions(
+  token: string,
+  status: string = 'PENDING_APPROVAL',
+): Promise<AdminProductSubmission[]> {
+  return request<AdminProductSubmission[]>('/admin/product-submissions', {
+    token,
+    query: { status },
+  })
+}
+
+export async function approveProductSubmission(
+  token: string,
+  productCode: string,
+  overrides: {
+    productDes?: string
+    categoryDes?: string
+    price?: string
+    prepTimeMinutes?: number
+    imageUrl?: string
+  },
+): Promise<AdminProductSubmission> {
+  return request<AdminProductSubmission>(
+    `/admin/product-submissions/${encodeURIComponent(productCode)}/approve`,
+    {
+      method: 'POST',
+      token,
+      body: {
+        product_des: overrides.productDes || undefined,
+        category_des: overrides.categoryDes || undefined,
+        price: overrides.price || undefined,
+        prep_time_minutes: overrides.prepTimeMinutes || undefined,
+        image_url: overrides.imageUrl || undefined,
+      },
+    },
+  )
+}
+
+export async function rejectProductSubmission(
+  token: string,
+  productCode: string,
+  reason: string,
+): Promise<AdminProductSubmission> {
+  return request<AdminProductSubmission>(
+    `/admin/product-submissions/${encodeURIComponent(productCode)}/reject`,
+    {
+      method: 'POST',
+      token,
+      body: { reason: reason || undefined },
     },
   )
 }
@@ -635,10 +805,6 @@ export async function updateOrderStatus(
 
 export async function getRiders(token: string, liveOnly = false): Promise<AdminRiderListResult> {
   return request<AdminRiderListResult>(liveOnly ? '/admin/riders/live' : '/admin/riders', { token })
-}
-
-export async function listServiceZones(): Promise<AdminServiceZone[]> {
-  return request<AdminServiceZone[]>('/service-zones')
 }
 
 export async function provisionRider(
@@ -827,4 +993,26 @@ export async function acknowledgeDispatchIncident(token: string, incidentId: num
     method: 'POST',
     token,
   })
+}
+
+export async function getPartnerCompliance(token: string): Promise<AdminPartnerComplianceItem[]> {
+  return request<AdminPartnerComplianceItem[]>('/admin/partner-compliance', { token })
+}
+
+export async function reviewPartnerComplianceDocument(
+  token: string,
+  documentId: number,
+  statusCd: 'VERIFIED' | 'REJECTED',
+  rejectionReason?: string,
+): Promise<AdminPartnerComplianceItem> {
+  return request<AdminPartnerComplianceItem>(`/admin/partner-compliance/${documentId}`, {
+    method: 'PUT',
+    token,
+    body: { statusCd, rejectionReason },
+  })
+}
+
+export async function getPartnerComplianceReviewUrl(token: string, documentId: number): Promise<string> {
+  const result = await request<{ url: string }>(`/admin/partner-compliance/${documentId}/review-url`, { token })
+  return result.url
 }
