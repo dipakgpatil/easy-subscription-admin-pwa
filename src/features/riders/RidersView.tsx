@@ -3,6 +3,7 @@ import {
   Bike,
   CircleCheck,
   Link2,
+  LockKeyhole,
   LoaderCircle,
   Mail,
   MapPin,
@@ -22,6 +23,7 @@ type RiderDraft = {
   firstName: string
   lastName: string
   mobileNo: string
+  password: string
   vehicleType: string
   defaultPayoutAmount: string
   serviceZoneCodes: string[]
@@ -32,6 +34,7 @@ const EMPTY_DRAFT: RiderDraft = {
   firstName: '',
   lastName: '',
   mobileNo: '',
+  password: '',
   vehicleType: 'BIKE',
   defaultPayoutAmount: '20.00',
   serviceZoneCodes: [],
@@ -113,6 +116,10 @@ export default function RidersView({ token, riders, serviceZones, onRefresh }: R
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (draft.password && draft.password.length < 12) {
+      setError('A store-review password must contain at least 12 characters.')
+      return
+    }
     setSubmitting(true)
     setMessage(null)
     setError(null)
@@ -213,6 +220,21 @@ export default function RidersView({ token, riders, serviceZones, onRefresh }: R
                   placeholder="9876543210"
                   autoComplete="tel"
                   maxLength={20}
+                />
+              </div>
+            </label>
+            <label>
+              Store-review password (optional)
+              <div className="input-with-icon">
+                <LockKeyhole size={17} aria-hidden="true" />
+                <input
+                  type="password"
+                  value={draft.password}
+                  onChange={(event) => setDraft((current) => ({ ...current, password: event.target.value }))}
+                  placeholder="At least 12 characters"
+                  autoComplete="new-password"
+                  minLength={12}
+                  maxLength={128}
                 />
               </div>
             </label>

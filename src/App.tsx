@@ -121,6 +121,7 @@ type MerchantDraft = {
   firstName: string
   lastName: string
   mobileNo: string
+  password: string
   displayName: string
   fssaiRegistrationNo: string
   pickupGroupCode: string
@@ -134,6 +135,7 @@ const EMPTY_MERCHANT_DRAFT: MerchantDraft = {
   firstName: '',
   lastName: '',
   mobileNo: '',
+  password: '',
   displayName: '',
   fssaiRegistrationNo: '',
   pickupGroupCode: '',
@@ -786,6 +788,10 @@ function App() {
     const displayName = merchantDraft.displayName.trim()
     const fssaiRegistrationNo = merchantDraft.fssaiRegistrationNo.trim()
     const defaultPrepMinutes = Number.parseInt(merchantDraft.defaultPrepMinutes, 10)
+    if (merchantDraft.password && merchantDraft.password.length < 12) {
+      setLastError('A store-review password must contain at least 12 characters.')
+      return
+    }
     if (!emailAddress || !firstName || !displayName || !/^[0-9]{14}$/.test(fssaiRegistrationNo) || !Number.isFinite(defaultPrepMinutes)) {
       setLastError('Merchant email, first name, display name, a 14-digit FSSAI number, and default prep time are required.')
       return
@@ -799,6 +805,7 @@ function App() {
         firstName,
         lastName: merchantDraft.lastName.trim(),
         mobileNo: merchantDraft.mobileNo.trim(),
+        password: merchantDraft.password,
         displayName,
         fssaiRegistrationNo,
         pickupGroupCode: merchantDraft.pickupGroupCode.trim(),
@@ -1722,6 +1729,18 @@ function App() {
                     </select>
                   </label>
                 </div>
+                <label>
+                  Store-review password (optional)
+                  <input
+                    type="password"
+                    value={merchantDraft.password}
+                    onChange={(event) => setMerchantDraft((current) => ({ ...current, password: event.target.value }))}
+                    placeholder="At least 12 characters"
+                    autoComplete="new-password"
+                    minLength={12}
+                    maxLength={128}
+                  />
+                </label>
                 <label>
                   Location label
                   <input value={merchantDraft.locationLabel} onChange={(event) => setMerchantDraft((current) => ({ ...current, locationLabel: event.target.value }))} placeholder="Central Kitchen" />

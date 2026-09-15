@@ -670,6 +670,7 @@ export async function provisionMerchant(
     firstName: string
     lastName?: string
     mobileNo?: string
+    password?: string
     displayName: string
     fssaiRegistrationNo: string
     pickupGroupCode?: string
@@ -686,6 +687,7 @@ export async function provisionMerchant(
       first_name: payload.firstName,
       last_name: payload.lastName || undefined,
       mobile_no: payload.mobileNo || undefined,
+      password: payload.password || undefined,
       display_name: payload.displayName,
       fssai_registration_no: payload.fssaiRegistrationNo,
       pickup_group_code: payload.pickupGroupCode || undefined,
@@ -814,6 +816,7 @@ export async function provisionRider(
     firstName: string
     lastName?: string
     mobileNo?: string
+    password?: string
     vehicleType: string
     defaultPayoutAmount: string
     serviceZoneCodes: string[]
@@ -827,6 +830,7 @@ export async function provisionRider(
       first_name: payload.firstName.trim(),
       last_name: payload.lastName?.trim() || undefined,
       mobile_no: payload.mobileNo?.trim() || undefined,
+      password: payload.password || undefined,
       vehicle_type: payload.vehicleType,
       default_payout_amount: payload.defaultPayoutAmount,
       serviceZoneCodes: payload.serviceZoneCodes,
