@@ -501,3 +501,48 @@ export type AdminPartnerComplianceItem = {
   rejection_reason: string | null
   overdue: boolean
 }
+
+export type SearchOutcome = 'ZERO_RESULT' | 'LOW_RESULT' | 'HEALTHY'
+
+export type SearchDayGroup = {
+  day: string
+  searches: number
+  distinct_terms: number
+  zero_result_searches: number
+  distinct_searchers: number
+}
+
+export type SearchTermStat = {
+  term: string
+  sample_raw_term: string | null
+  searches: number
+  distinct_searchers: number
+  average_result_count: number
+  zero_result_searches: number
+  zero_result_rate: number
+  last_searched_at: string | null
+  outcome_cd: SearchOutcome
+}
+
+export type SearchTermZone = {
+  service_zone_code: string | null
+  searches: number
+  zero_result_searches: number
+  distinct_terms: number
+}
+
+export type SearchAnalyticsSummary = {
+  generated_at: string
+  date_from: string
+  date_to: string
+  service_zone_code: string | null
+  total_searches: number
+  distinct_terms: number
+  distinct_searchers: number
+  zero_result_searches: number
+  zero_result_rate: number
+  days: SearchDayGroup[]
+  top_terms: SearchTermStat[]
+  unmet_terms: SearchTermStat[]
+  zones: SearchTermZone[]
+}

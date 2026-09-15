@@ -25,6 +25,7 @@ import type {
   AdminAdministrator,
   AdminAdministratorResult,
   AdminWalletCreditResponse,
+  SearchAnalyticsSummary,
 } from './types'
 
 const PRODUCTION_ADMIN_ORIGIN = 'https://admin.cravix.co.in'
@@ -1019,4 +1020,28 @@ export async function reviewPartnerComplianceDocument(
 export async function getPartnerComplianceReviewUrl(token: string, documentId: number): Promise<string> {
   const result = await request<{ url: string }>(`/admin/partner-compliance/${documentId}/review-url`, { token })
   return result.url
+}
+
+export async function getSearchAnalytics(
+  token: string,
+  query: {
+    from?: string
+    to?: string
+    zoneCode?: string
+    outcome?: string
+    q?: string
+    limit?: number
+  } = {},
+): Promise<SearchAnalyticsSummary> {
+  return request<SearchAnalyticsSummary>('/admin/search-analytics', {
+    token,
+    query: {
+      from: query.from,
+      to: query.to,
+      zoneCode: query.zoneCode,
+      outcome: query.outcome,
+      q: query.q,
+      limit: query.limit ?? 50,
+    },
+  })
 }

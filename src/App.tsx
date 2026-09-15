@@ -28,6 +28,7 @@ import DispatchView from './features/dispatch/DispatchView'
 import AdministratorsView from './features/administrators/AdministratorsView'
 import RidersView from './features/riders/RidersView'
 import ComplianceView from './features/compliance/ComplianceView'
+import { SearchDemandView } from './features/search/SearchDemandView'
 import {
   ApiError,
   approveProductSubmission,
@@ -95,7 +96,7 @@ import type {
   AdminWalletCreditResponse,
 } from './lib/types'
 
-type ViewTab = 'overview' | 'catalog' | 'orders' | 'history' | 'riders' | 'compliance' | 'payouts' | 'referrals' | 'dispatch' | 'errors' | 'security' | 'administrators'
+type ViewTab = 'overview' | 'catalog' | 'orders' | 'history' | 'riders' | 'compliance' | 'payouts' | 'referrals' | 'dispatch' | 'search' | 'errors' | 'security' | 'administrators'
 type LoginMode = 'google' | 'otp'
 
 type CatalogProductDraft = {
@@ -319,7 +320,7 @@ function App() {
   const [session, setSession] = useState<AdminSession | null>(() => readSession())
   const [activeTab, setActiveTab] = useState<ViewTab>(() => {
     const stored = readActiveTab()
-    if (stored === 'overview' || stored === 'catalog' || stored === 'orders' || stored === 'history' || stored === 'riders' || stored === 'compliance' || stored === 'payouts' || stored === 'referrals' || stored === 'dispatch' || stored === 'errors' || stored === 'security' || stored === 'administrators') {
+    if (stored === 'overview' || stored === 'catalog' || stored === 'orders' || stored === 'history' || stored === 'riders' || stored === 'compliance' || stored === 'payouts' || stored === 'referrals' || stored === 'dispatch' || stored === 'search' || stored === 'errors' || stored === 'security' || stored === 'administrators') {
       return stored
     }
     return 'overview'
@@ -576,7 +577,7 @@ function App() {
     if (!session) {
       return false
     }
-    if (activeTab === 'errors' || activeTab === 'security' || activeTab === 'dispatch' || activeTab === 'administrators') {
+    if (activeTab === 'errors' || activeTab === 'security' || activeTab === 'dispatch' || activeTab === 'search' || activeTab === 'administrators') {
       return false
     }
     setLastError(null)
@@ -1359,6 +1360,7 @@ function App() {
             ['payouts', 'Payouts'],
             ['referrals', 'Referrals'],
             ['dispatch', 'Dispatch'],
+            ['search', 'Search demand'],
             ['errors', 'Errors'],
             ['security', 'Security'],
             ['administrators', 'Administrators'],
@@ -1403,6 +1405,7 @@ function App() {
               {activeTab === 'dispatch' && 'Delivery dispatch watch'}
               {activeTab === 'errors' && 'Application error ledger'}
               {activeTab === 'security' && 'Security and login activity'}
+              {activeTab === 'search' && 'Customer search demand'}
               {activeTab === 'administrators' && 'Administrator access'}
             </h1>
           </div>
@@ -1440,7 +1443,7 @@ function App() {
               {streamStatus === 'live' ? <Wifi aria-hidden="true" /> : <WifiOff aria-hidden="true" />}
               {streamStatus === 'live' ? 'Alerts live' : 'Reconnecting alerts'}
             </span>
-            {activeTab !== 'errors' && activeTab !== 'security' && activeTab !== 'dispatch' && activeTab !== 'administrators' ? (
+            {activeTab !== 'errors' && activeTab !== 'security' && activeTab !== 'dispatch' && activeTab !== 'search' && activeTab !== 'administrators' ? (
               <button className="ghost-button refresh-button" onClick={() => void handleManualRefresh()} disabled={isRefreshing}>
                 <RefreshCw className={isRefreshing ? 'is-spinning' : undefined} aria-hidden="true" />
                 {isRefreshing ? 'Refreshing' : 'Refresh'}
@@ -1674,6 +1677,10 @@ function App() {
 
         {activeTab === 'dispatch' ? (
           <DispatchView token={session.access_token} />
+        ) : null}
+
+        {activeTab === 'search' ? (
+          <SearchDemandView token={session.access_token} />
         ) : null}
 
         {activeTab === 'administrators' ? (
