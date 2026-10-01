@@ -1333,6 +1333,13 @@ label {
 
 .rider-form-actions {
   justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+.rider-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
 }
 
 .rider-command-button {

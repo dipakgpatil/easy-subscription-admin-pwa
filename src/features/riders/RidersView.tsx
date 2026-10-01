@@ -7,15 +7,18 @@ import {
   LoaderCircle,
   Mail,
   MapPin,
+  Pencil,
   Phone,
   RefreshCw,
   Search,
   ShieldCheck,
   ShieldOff,
+  Save,
   UserPlus,
   WalletCards,
+  X,
 } from 'lucide-react'
-import { provisionRider, updateRiderStatus } from '../../lib/api'
+import { provisionRider, updateRider, updateRiderStatus } from '../../lib/api'
 import type { AdminRiderListItem, AdminRiderListResult, AdminServiceZone } from '../../lib/types'
 
 type RiderDraft = {
@@ -38,6 +41,20 @@ const EMPTY_DRAFT: RiderDraft = {
   vehicleType: 'BIKE',
   defaultPayoutAmount: '20.00',
   serviceZoneCodes: [],
+}
+
+function draftFromRider(rider: AdminRiderListItem): RiderDraft {
+  const [first, ...rest] = rider.display_name.split(' ')
+  return {
+    emailAddress: rider.email_address ?? '',
+    firstName: rider.first_name ?? first ?? '',
+    lastName: rider.first_name !== null ? rider.last_name ?? '' : rest.join(' '),
+    mobileNo: rider.mobile_no ?? '',
+    password: '',
+    vehicleType: rider.vehicle_type ?? 'BIKE',
+    defaultPayoutAmount: rider.default_payout_amount ?? '20.00',
+    serviceZoneCodes: [...rider.service_zone_codes],
+  }
 }
 
 function displayDate(value: string | null): string {
@@ -78,6 +95,7 @@ type RidersViewProps = {
 
 export default function RidersView({ token, riders, serviceZones, onRefresh }: RidersViewProps) {
   const [draft, setDraft] = useState<RiderDraft>(EMPTY_DRAFT)
+  const [editingRider, setEditingRider] = useState<AdminRiderListItem | null>(null)
   const [query, setQuery] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
@@ -114,22 +132,64 @@ export default function RidersView({ token, riders, serviceZones, onRefresh }: R
     }
   }
 
+  function startEditing(rider: AdminRiderListItem) {
+    setEditingRider(rider)
+    setDraft(draftFromRider(rider))
+    setMessage(null)
+    setError(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function stopEditing() {
+    setEditingRider(null)
+    setDraft(EMPTY_DRAFT)
+    setError(null)
+  }
+
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (draft.password && draft.password.length < 12) {
-      setError('A store-review password must contain at least 12 characters.')
+      setError('A password must contain at least 12 characters.')
+      return
+    }
+    const editing = editingRider
+    const emailChanged =
+      editing !== null && draft.emailAddress.trim().toLowerCase() !== (editing.email_address ?? '').toLowerCase()
+    if (
+      emailChanged &&
+      !window.confirm(
+        `Change ${editing.display_name}'s email to ${draft.emailAddress.trim()}? Their current Google account will be unlinked and they must sign in with the new Google email.`,
+      )
+    ) {
       return
     }
     setSubmitting(true)
     setMessage(null)
     setError(null)
     try {
-      const rider = await provisionRider(token, draft)
-      setDraft(EMPTY_DRAFT)
-      setMessage(`${rider.display_name} is approved and can now sign in with ${rider.email_address}.`)
+      if (editing) {
+        const rider = await updateRider(token, editing.rider_uid, draft)
+        setEditingRider(null)
+        setDraft(EMPTY_DRAFT)
+        setMessage(
+          emailChanged
+            ? `${rider.display_name} is updated and must now sign in with ${rider.email_address}.`
+            : `${rider.display_name} is updated.`,
+        )
+      } else {
+        const rider = await provisionRider(token, draft)
+        setDraft(EMPTY_DRAFT)
+        setMessage(`${rider.display_name} is approved and can now sign in with ${rider.email_address}.`)
+      }
       await onRefresh()
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to create the rider account.')
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : editing
+            ? 'Unable to update the rider account.'
+            : 'Unable to create the rider account.',
+      )
     } finally {
       setSubmitting(false)
     }
@@ -162,8 +222,8 @@ export default function RidersView({ token, riders, serviceZones, onRefresh }: R
       <section className="panel rider-onboarding-panel">
         <div className="panel-head">
           <div>
-            <p className="section-kicker">Onboarding</p>
-            <h2>Create approved rider</h2>
+            <p className="section-kicker">{editingRider ? 'Edit rider' : 'Onboarding'}</p>
+            <h2>{editingRider ? editingRider.display_name : 'Create approved rider'}</h2>
           </div>
           <div className="rider-summary" aria-label="Rider account summary">
             <span><CircleCheck size={16} />{activeCount} active</span>
@@ -219,12 +279,12 @@ export default function RidersView({ token, riders, serviceZones, onRefresh }: R
                   inputMode="tel"
                   placeholder="9876543210"
                   autoComplete="tel"
-                  maxLength={20}
+                  maxLength={12}
                 />
               </div>
             </label>
             <label>
-              Store-review password (optional)
+              {editingRider ? 'New password (blank keeps current)' : 'Store-review password (optional)'}
               <div className="input-with-icon">
                 <LockKeyhole size={17} aria-hidden="true" />
                 <input
@@ -285,9 +345,27 @@ export default function RidersView({ token, riders, serviceZones, onRefresh }: R
           </fieldset>
 
           <div className="rider-form-actions">
+            {editingRider ? (
+              <button className="ghost-button rider-command-button" type="button" onClick={stopEditing} disabled={submitting}>
+                <X size={18} />
+                Cancel
+              </button>
+            ) : null}
             <button className="primary-button rider-command-button" type="submit" disabled={submitting}>
-              {submitting ? <LoaderCircle className="is-spinning" size={18} /> : <UserPlus size={18} />}
-              {submitting ? 'Creating rider' : 'Approve and create'}
+              {submitting ? (
+                <LoaderCircle className="is-spinning" size={18} />
+              ) : editingRider ? (
+                <Save size={18} />
+              ) : (
+                <UserPlus size={18} />
+              )}
+              {submitting
+                ? editingRider
+                  ? 'Saving'
+                  : 'Creating rider'
+                : editingRider
+                  ? 'Save changes'
+                  : 'Approve and create'}
             </button>
           </div>
         </form>
@@ -375,25 +453,36 @@ export default function RidersView({ token, riders, serviceZones, onRefresh }: R
                 ) : (
                   <span className="muted-line"><MapPin size={16} />{displayDate(null)}</span>
                 )}
-                <button
-                  className={rider.status_cd === 'ACTIVE' ? 'ghost-button rider-command-button danger-button' : 'secondary-button rider-command-button'}
-                  type="button"
-                  onClick={() => void changeStatus(rider)}
-                  disabled={updatingRiderUid === rider.rider_uid}
-                >
-                  {updatingRiderUid === rider.rider_uid ? (
-                    <LoaderCircle className="is-spinning" size={18} />
-                  ) : rider.status_cd === 'ACTIVE' ? (
-                    <ShieldOff size={18} />
-                  ) : (
-                    <ShieldCheck size={18} />
-                  )}
-                  {updatingRiderUid === rider.rider_uid
-                    ? 'Updating'
-                    : rider.status_cd === 'ACTIVE'
-                      ? 'Suspend'
-                      : 'Activate'}
-                </button>
+                <div className="rider-card-actions">
+                  <button
+                    className="ghost-button rider-command-button"
+                    type="button"
+                    onClick={() => startEditing(rider)}
+                    disabled={submitting || editingRider?.rider_uid === rider.rider_uid}
+                  >
+                    <Pencil size={18} />
+                    {editingRider?.rider_uid === rider.rider_uid ? 'Editing' : 'Edit'}
+                  </button>
+                  <button
+                    className={rider.status_cd === 'ACTIVE' ? 'ghost-button rider-command-button danger-button' : 'secondary-button rider-command-button'}
+                    type="button"
+                    onClick={() => void changeStatus(rider)}
+                    disabled={updatingRiderUid === rider.rider_uid}
+                  >
+                    {updatingRiderUid === rider.rider_uid ? (
+                      <LoaderCircle className="is-spinning" size={18} />
+                    ) : rider.status_cd === 'ACTIVE' ? (
+                      <ShieldOff size={18} />
+                    ) : (
+                      <ShieldCheck size={18} />
+                    )}
+                    {updatingRiderUid === rider.rider_uid
+                      ? 'Updating'
+                      : rider.status_cd === 'ACTIVE'
+                        ? 'Suspend'
+                        : 'Activate'}
+                  </button>
+                </div>
               </div>
             </article>
           ))}

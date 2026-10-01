@@ -169,6 +169,8 @@ export type AdminOrderDetail = {
 export type AdminRiderListItem = {
   rider_uid: number
   display_name: string
+  first_name: string | null
+  last_name: string | null
   email_address: string | null
   mobile_no: string | null
   vehicle_type: string | null
@@ -181,6 +183,7 @@ export type AdminRiderListItem = {
   location_updated_at: string | null
   active_order_no: number | null
   active_order_status: string | null
+  default_payout_amount: string
   pending_payout_amount: string
 }
 

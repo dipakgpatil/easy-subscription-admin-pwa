@@ -839,6 +839,37 @@ export async function provisionRider(
   })
 }
 
+export async function updateRider(
+  token: string,
+  riderUid: number,
+  payload: {
+    emailAddress: string
+    firstName: string
+    lastName?: string
+    mobileNo?: string
+    password?: string
+    vehicleType: string
+    defaultPayoutAmount: string
+    serviceZoneCodes: string[]
+  },
+): Promise<AdminRiderProfile> {
+  // Fields left blank are cleared (last name, mobile) or unchanged (password).
+  return request<AdminRiderProfile>(`/admin/riders/${encodeURIComponent(String(riderUid))}`, {
+    method: 'PUT',
+    token,
+    body: {
+      email_address: payload.emailAddress.trim().toLowerCase(),
+      first_name: payload.firstName.trim(),
+      last_name: payload.lastName?.trim() || null,
+      mobile_no: payload.mobileNo?.replace(/\s+/g, '') || null,
+      password: payload.password || undefined,
+      vehicle_type: payload.vehicleType,
+      default_payout_amount: payload.defaultPayoutAmount,
+      serviceZoneCodes: payload.serviceZoneCodes,
+    },
+  })
+}
+
 export async function updateRiderStatus(
   token: string,
   riderUid: number,
