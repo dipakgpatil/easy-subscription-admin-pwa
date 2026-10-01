@@ -28,6 +28,8 @@ import DispatchView from './features/dispatch/DispatchView'
 import AdministratorsView from './features/administrators/AdministratorsView'
 import RidersView from './features/riders/RidersView'
 import ComplianceView from './features/compliance/ComplianceView'
+import McpConnectView from './features/mcp/McpConnectView'
+import { clearPendingMcpConnect, takePendingMcpConnect } from './features/mcp/mcpConnect'
 import { SearchDemandView } from './features/search/SearchDemandView'
 import {
   ApiError,
@@ -318,6 +320,7 @@ function OrderJourney({ order }: { order: AdminOrderDetail }) {
 
 function App() {
   const [session, setSession] = useState<AdminSession | null>(() => readSession())
+  const [mcpConnect, setMcpConnect] = useState(() => takePendingMcpConnect())
   const [activeTab, setActiveTab] = useState<ViewTab>(() => {
     const stored = readActiveTab()
     if (stored === 'overview' || stored === 'catalog' || stored === 'orders' || stored === 'history' || stored === 'riders' || stored === 'compliance' || stored === 'payouts' || stored === 'referrals' || stored === 'dispatch' || stored === 'search' || stored === 'errors' || stored === 'security' || stored === 'administrators') {
@@ -1228,6 +1231,10 @@ function App() {
             </div>
           </div>
 
+          {mcpConnect && !isGoogleRedirectCallback ? (
+            <p className="success-banner">Sign in to connect Claude to Cravix Admin.</p>
+          ) : null}
+
           {isGoogleRedirectCallback ? (
             <section className="auth-panel">
               <div className="auth-panel-copy">
@@ -1330,6 +1337,20 @@ function App() {
           )}
         </section>
       </main>
+    )
+  }
+
+  if (mcpConnect) {
+    return (
+      <McpConnectView
+        session={session}
+        request={mcpConnect}
+        onDone={() => {
+          clearPendingMcpConnect()
+          setMcpConnect(null)
+        }}
+        onSessionExpired={() => handleLogout('Your session expired. Sign in again to connect Claude.')}
+      />
     )
   }
 

@@ -486,6 +486,18 @@ export async function loginAdminWithMockGoogleProfile(email: string, givenName: 
   })
 }
 
+export async function authorizeMcp(
+  token: string,
+  redirectUri: string,
+  codeChallenge: string,
+): Promise<{ code: string; expires_in: number }> {
+  return request<{ code: string; expires_in: number }>('/admin/auth/mcp/authorize', {
+    method: 'POST',
+    token,
+    body: { redirect_uri: redirectUri, code_challenge: codeChallenge, code_challenge_method: 'S256' },
+  })
+}
+
 export async function requestAdminOtp(mobileNo: string): Promise<{ otp: string | null }> {
   return request<{ otp: string | null }>('/admin/auth/otp/request', {
     method: 'POST',

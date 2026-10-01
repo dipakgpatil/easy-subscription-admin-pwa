@@ -3078,3 +3078,28 @@ label {
     grid-column: 1 / -1;
   }
 }
+
+.mcp-connect-card .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.mcp-connect-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+.mcp-connect-actions button,
+.mcp-connect-skip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.mcp-connect-skip {
+  justify-self: start;
+}
