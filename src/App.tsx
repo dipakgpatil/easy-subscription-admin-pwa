@@ -29,6 +29,7 @@ import AdministratorsView from './features/administrators/AdministratorsView'
 import RidersView from './features/riders/RidersView'
 import ComplianceView from './features/compliance/ComplianceView'
 import McpConnectView from './features/mcp/McpConnectView'
+import OperationsView from './features/operations/OperationsView'
 import { clearPendingMcpConnect, takePendingMcpConnect } from './features/mcp/mcpConnect'
 import { SearchDemandView } from './features/search/SearchDemandView'
 import {
@@ -98,7 +99,7 @@ import type {
   AdminWalletCreditResponse,
 } from './lib/types'
 
-type ViewTab = 'overview' | 'catalog' | 'orders' | 'history' | 'riders' | 'compliance' | 'payouts' | 'referrals' | 'dispatch' | 'search' | 'errors' | 'security' | 'administrators'
+type ViewTab = 'overview' | 'catalog' | 'orders' | 'history' | 'riders' | 'compliance' | 'payouts' | 'referrals' | 'dispatch' | 'search' | 'operations' | 'errors' | 'security' | 'administrators'
 type LoginMode = 'google' | 'otp'
 
 type CatalogProductDraft = {
@@ -323,7 +324,7 @@ function App() {
   const [mcpConnect, setMcpConnect] = useState(() => takePendingMcpConnect())
   const [activeTab, setActiveTab] = useState<ViewTab>(() => {
     const stored = readActiveTab()
-    if (stored === 'overview' || stored === 'catalog' || stored === 'orders' || stored === 'history' || stored === 'riders' || stored === 'compliance' || stored === 'payouts' || stored === 'referrals' || stored === 'dispatch' || stored === 'search' || stored === 'errors' || stored === 'security' || stored === 'administrators') {
+    if (stored === 'overview' || stored === 'catalog' || stored === 'orders' || stored === 'history' || stored === 'riders' || stored === 'compliance' || stored === 'payouts' || stored === 'referrals' || stored === 'dispatch' || stored === 'search' || stored === 'operations' || stored === 'errors' || stored === 'security' || stored === 'administrators') {
       return stored
     }
     return 'overview'
@@ -580,7 +581,7 @@ function App() {
     if (!session) {
       return false
     }
-    if (activeTab === 'errors' || activeTab === 'security' || activeTab === 'dispatch' || activeTab === 'search' || activeTab === 'administrators') {
+    if (activeTab === 'errors' || activeTab === 'security' || activeTab === 'dispatch' || activeTab === 'search' || activeTab === 'operations' || activeTab === 'administrators') {
       return false
     }
     setLastError(null)
@@ -1376,6 +1377,7 @@ function App() {
             ['catalog', 'Catalog'],
             ['orders', 'Orders'],
             ['history', 'History'],
+            ['operations', 'Zones & banners'],
             ['riders', 'Riders'],
             ['compliance', 'Compliance'],
             ['payouts', 'Payouts'],
@@ -1427,6 +1429,7 @@ function App() {
               {activeTab === 'errors' && 'Application error ledger'}
               {activeTab === 'security' && 'Security and login activity'}
               {activeTab === 'search' && 'Customer search demand'}
+              {activeTab === 'operations' && 'Zone ordering and app banners'}
               {activeTab === 'administrators' && 'Administrator access'}
             </h1>
           </div>
@@ -1464,7 +1467,7 @@ function App() {
               {streamStatus === 'live' ? <Wifi aria-hidden="true" /> : <WifiOff aria-hidden="true" />}
               {streamStatus === 'live' ? 'Alerts live' : 'Reconnecting alerts'}
             </span>
-            {activeTab !== 'errors' && activeTab !== 'security' && activeTab !== 'dispatch' && activeTab !== 'search' && activeTab !== 'administrators' ? (
+            {activeTab !== 'errors' && activeTab !== 'security' && activeTab !== 'dispatch' && activeTab !== 'search' && activeTab !== 'operations' && activeTab !== 'administrators' ? (
               <button className="ghost-button refresh-button" onClick={() => void handleManualRefresh()} disabled={isRefreshing}>
                 <RefreshCw className={isRefreshing ? 'is-spinning' : undefined} aria-hidden="true" />
                 {isRefreshing ? 'Refreshing' : 'Refresh'}
@@ -1702,6 +1705,10 @@ function App() {
 
         {activeTab === 'search' ? (
           <SearchDemandView token={session.access_token} />
+        ) : null}
+
+        {activeTab === 'operations' ? (
+          <OperationsView token={session.access_token} />
         ) : null}
 
         {activeTab === 'administrators' ? (

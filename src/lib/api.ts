@@ -26,6 +26,8 @@ import type {
   AdminAdministratorResult,
   AdminWalletCreditResponse,
   SearchAnalyticsSummary,
+  AdminOperations,
+  AnnouncementInput,
 } from './types'
 
 const PRODUCTION_ADMIN_ORIGIN = 'https://admin.cravix.co.in'
@@ -1087,4 +1089,36 @@ export async function getSearchAnalytics(
       limit: query.limit ?? 50,
     },
   })
+}
+
+export async function getOperations(token: string): Promise<AdminOperations> {
+  return request<AdminOperations>('/admin/operations', { token })
+}
+
+export async function setZoneOrdering(
+  token: string,
+  zoneCode: string,
+  payload: { ordering_open: boolean; closed_message?: string | null; reopens_at?: string | null },
+): Promise<AdminOperations> {
+  return request<AdminOperations>(`/admin/operations/zones/${encodeURIComponent(zoneCode)}`, {
+    method: 'PUT',
+    token,
+    body: payload,
+  })
+}
+
+export async function createAnnouncement(token: string, payload: AnnouncementInput): Promise<AdminOperations> {
+  return request<AdminOperations>('/admin/operations/announcements', { method: 'POST', token, body: payload })
+}
+
+export async function updateAnnouncement(
+  token: string,
+  id: number,
+  payload: AnnouncementInput,
+): Promise<AdminOperations> {
+  return request<AdminOperations>(`/admin/operations/announcements/${id}`, { method: 'PUT', token, body: payload })
+}
+
+export async function deleteAnnouncement(token: string, id: number): Promise<AdminOperations> {
+  return request<AdminOperations>(`/admin/operations/announcements/${id}`, { method: 'DELETE', token })
 }

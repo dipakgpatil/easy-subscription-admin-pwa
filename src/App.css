@@ -3103,3 +3103,82 @@ label {
 .mcp-connect-skip {
   justify-self: start;
 }
+
+.operations-view {
+  display: grid;
+  gap: 1rem;
+}
+
+.operations-zone-list,
+.operations-banner-list {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.operations-zone-card,
+.operations-banner-row {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.operations-banner-row {
+  grid-template-columns: 1fr auto;
+  align-items: start;
+}
+
+.operations-zone-head,
+.operations-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.operations-actions button,
+.operations-icon-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.operations-zone-note,
+.operations-banner-message {
+  margin: 0;
+}
+
+.operations-close-form,
+.operations-banner-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.operations-banner-form {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  align-items: end;
+}
+
+.operations-close-form label,
+.operations-banner-form label {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.operations-wide {
+  grid-column: 1 / -1;
+}
+
+.operations-checkbox {
+  display: flex !important;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+@media (max-width: 720px) {
+  .operations-banner-row {
+    grid-template-columns: 1fr;
+  }
+}

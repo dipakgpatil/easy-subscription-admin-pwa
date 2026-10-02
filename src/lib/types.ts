@@ -549,3 +549,46 @@ export type SearchAnalyticsSummary = {
   unmet_terms: SearchTermStat[]
   zones: SearchTermZone[]
 }
+
+export type AnnouncementTone = 'INFO' | 'SUCCESS' | 'WARNING'
+export type AnnouncementAudience = 'ALL' | 'ZONE' | 'OUT_OF_AREA'
+
+export type AdminZoneOperations = {
+  code: string
+  name: string
+  is_active: boolean
+  ordering_open: boolean
+  closed_message: string | null
+  reopens_at: string | null
+  ordering_updated_at: string | null
+  ordering_updated_by: string | null
+}
+
+export type AdminAnnouncement = {
+  id: number
+  message: string
+  tone: AnnouncementTone
+  audience: AnnouncementAudience
+  service_zone_code: string | null
+  starts_at: string | null
+  expires_at: string
+  active: boolean
+  status: 'SCHEDULED' | 'LIVE' | 'EXPIRED' | 'DISABLED'
+  created_by: string | null
+  created_at: string | null
+}
+
+export type AdminOperations = {
+  zones: AdminZoneOperations[]
+  announcements: AdminAnnouncement[]
+}
+
+export type AnnouncementInput = {
+  message: string
+  tone: AnnouncementTone
+  audience: AnnouncementAudience
+  service_zone_code: string | null
+  starts_at: string | null
+  expires_at: string
+  active: boolean
+}

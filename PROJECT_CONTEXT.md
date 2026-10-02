@@ -85,3 +85,9 @@ Allow calls `POST /admin/auth/mcp/authorize` and sends the browser to the loopba
 `redirect_uri` with a one-time code; Cancel sends `error=access_denied`. Only
 `http://127.0.0.1|localhost:<port>/callback` is accepted, here and in the backend.
 Never put the access token in that redirect.
+
+## Zones & banners (`src/features/operations/OperationsView.tsx`)
+
+Opens/closes each zone for ordering (with the message and optional opening time customers
+see) and manages customer-app banners with start/expiry. Date inputs are the browser's local
+time, converted to absolute ISO timestamps before they are sent.
