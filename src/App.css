@@ -3182,3 +3182,360 @@ label {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- Merchants: list → workspace ---------- */
+.merchants-view,
+.merchant-workspace {
+  display: grid;
+  gap: 1rem;
+}
+
+.merchant-list-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.merchant-list-tools {
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.merchant-list-tools,
+.merchant-form-actions,
+.merchant-header-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.merchant-list-tools button,
+.merchant-form-actions button,
+.merchant-back,
+.merchant-icon-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.merchant-search {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: min(320px, 100%);
+  padding: 0 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card-strong);
+  color: var(--ink-soft);
+}
+
+.merchant-search input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  padding: 0.55rem 0;
+  outline: none;
+}
+
+.merchant-list {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+.merchant-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto auto;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card-strong);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.merchant-row:hover {
+  border-color: var(--primary);
+}
+
+.merchant-row-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--bg-soft);
+  color: var(--forest);
+}
+
+.merchant-row-main {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.merchant-row-gaps {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: #9a5b00;
+  font-size: 0.82rem;
+}
+
+.merchant-header {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.merchant-back {
+  justify-self: start;
+}
+
+.merchant-header-main {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.merchant-header-main h2 {
+  margin: 0;
+}
+
+.merchant-header-badges .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.merchant-sections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.75rem;
+}
+
+.merchant-section-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.merchant-section-tab.is-active {
+  background: var(--forest);
+  border-color: var(--forest);
+  color: #fff;
+}
+
+.merchant-count {
+  min-width: 1.4rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--lime);
+  color: var(--forest);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.merchant-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.merchant-form-grid label {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.merchant-form-wide,
+.merchant-form-grid .merchant-form-actions {
+  grid-column: 1 / -1;
+}
+
+.merchant-form-actions {
+  justify-content: flex-end;
+  margin-top: 0.75rem;
+}
+
+.merchant-subhead {
+  margin-top: 1.25rem;
+}
+
+.merchant-zone-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.merchant-zone-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+/* Menu table */
+.menu-table {
+  display: grid;
+  margin-top: 0.75rem;
+}
+
+.menu-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 150px 90px 90px 40px;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.25rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.menu-row.is-off .menu-item {
+  opacity: 0.55;
+}
+
+.menu-head {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.menu-item > span {
+  display: grid;
+  min-width: 0;
+}
+
+.menu-item img,
+.menu-thumb,
+.catalog-pick img {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--bg-soft);
+}
+
+.menu-number {
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.menu-price {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.menu-price .muted-line {
+  font-size: 0.75rem;
+}
+
+.menu-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* Catalog picker */
+.catalog-picker {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.catalog-picker-search {
+  min-width: 100%;
+}
+
+.catalog-picker-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 0.5rem;
+  max-height: 460px;
+  overflow: auto;
+}
+
+.catalog-pick {
+  display: grid;
+  grid-template-columns: auto 44px minmax(0, 1fr);
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.catalog-pick.is-picked {
+  border-color: var(--primary);
+  background: rgba(255, 90, 54, 0.06);
+}
+
+.catalog-pick-text {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.catalog-pick-text strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .merchant-row {
+    grid-template-columns: auto 1fr auto;
+  }
+
+  .merchant-row > svg {
+    display: none;
+  }
+
+  .menu-row {
+    grid-template-columns: minmax(0, 1fr) 110px;
+  }
+
+  .menu-head {
+    display: none;
+  }
+}
+
+.menu-row .merchant-icon-button {
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 10px;
+  color: #c23a1c;
+}

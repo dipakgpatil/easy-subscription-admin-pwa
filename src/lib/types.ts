@@ -227,6 +227,13 @@ export type AdminMerchantProfile = {
   default_prep_minutes: number
   location_label: string | null
   coverage_zone_codes: string[]
+  first_name?: string | null
+  last_name?: string | null
+  address?: string | null
+  latitude?: number | null
+  longitude?: number | null
+  google_linked?: boolean
+  active_product_count?: number
 }
 
 export type AdminCatalogProduct = {
@@ -592,3 +599,44 @@ export type AnnouncementInput = {
   expires_at: string
   active: boolean
 }
+
+export type AdminMerchantMenuItem = {
+  product_code: string
+  product_description: string
+  product_type: string
+  category_code: number | null
+  category_description: string | null
+  image_url: string | null
+  prep_time_minutes: number
+  active_yn: 'Y' | 'N'
+  price_override: string | null
+  effective_price: string | null
+  base_price: string | null
+}
+
+export type AdminCatalogProductRow = {
+  product_code: string
+  name: string
+  category_description: string | null
+  base_price: string | null
+  image_url: string | null
+  status_cd: string | null
+  merchant_count: number
+}
+
+export type MerchantUpdateInput = Partial<{
+  email_address: string
+  first_name: string
+  last_name: string | null
+  display_name: string
+  mobile_no: string | null
+  password: string
+  fssai_registration_no: string
+  kitchen_type: 'IN_HOUSE' | 'VENDOR'
+  default_prep_minutes: number
+  location_label: string | null
+  pickup_group_code: string | null
+  address: string | null
+  latitude: number | null
+  longitude: number | null
+}>

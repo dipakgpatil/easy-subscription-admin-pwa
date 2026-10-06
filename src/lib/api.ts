@@ -28,6 +28,9 @@ import type {
   SearchAnalyticsSummary,
   AdminOperations,
   AnnouncementInput,
+  AdminMerchantMenuItem,
+  AdminCatalogProductRow,
+  MerchantUpdateInput,
 } from './types'
 
 const PRODUCTION_ADMIN_ORIGIN = 'https://admin.cravix.co.in'
@@ -1121,4 +1124,42 @@ export async function updateAnnouncement(
 
 export async function deleteAnnouncement(token: string, id: number): Promise<AdminOperations> {
   return request<AdminOperations>(`/admin/operations/announcements/${id}`, { method: 'DELETE', token })
+}
+
+export async function getMerchant(token: string, merchantUid: number): Promise<AdminMerchantProfile> {
+  return request<AdminMerchantProfile>(`/admin/merchants/${merchantUid}`, { token })
+}
+
+export async function updateMerchant(
+  token: string,
+  merchantUid: number,
+  payload: MerchantUpdateInput,
+): Promise<AdminMerchantProfile> {
+  return request<AdminMerchantProfile>(`/admin/merchants/${merchantUid}`, { method: 'PUT', token, body: payload })
+}
+
+export async function getMerchantMenu(token: string, merchantUid: number): Promise<AdminMerchantMenuItem[]> {
+  return request<AdminMerchantMenuItem[]>(`/admin/merchants/${merchantUid}/products`, { token })
+}
+
+export async function removeMerchantMenuItem(
+  token: string,
+  merchantUid: number,
+  productCode: string,
+): Promise<AdminMerchantMenuItem[]> {
+  return request<AdminMerchantMenuItem[]>(
+    `/admin/merchants/${merchantUid}/products/${encodeURIComponent(productCode)}`,
+    { method: 'DELETE', token },
+  )
+}
+
+export async function searchCatalogProducts(
+  token: string,
+  query: string,
+  limit = 50,
+): Promise<AdminCatalogProductRow[]> {
+  return request<AdminCatalogProductRow[]>('/admin/catalog/products/search', {
+    token,
+    query: { query: query.trim() || undefined, limit },
+  })
 }

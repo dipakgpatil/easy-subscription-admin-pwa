@@ -91,3 +91,13 @@ Never put the access token in that redirect.
 Opens/closes each zone for ordering (with the message and optional opening time customers
 see) and manages customer-app banners with start/expiry. Date inputs are the browser's local
 time, converted to absolute ISO timestamps before they are sent.
+
+## Merchants (`src/features/merchants/`)
+
+List → workspace. `MerchantsView` lists merchants with setup gaps (no zone, empty menu, no
+pickup location) and creates new ones; `MerchantWorkspace` has Menu, Profile & location and
+Delivery zones sections. The Menu edits price override, prep time and availability inline,
+adds products from a searchable catalog (`/admin/catalog/products/search`) or creates a new
+one straight onto the menu. Provisioning upserts by email, so the create form refuses an email
+that already belongs to a merchant. The Catalog tab now only creates products and reviews
+merchant submissions.
