@@ -3315,7 +3315,8 @@ label {
   gap: 0.25rem;
 }
 
-.merchant-sections {
+.merchant-sections,
+.ws-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
@@ -3538,4 +3539,405 @@ label {
   padding: 0;
   border-radius: 10px;
   color: #c23a1c;
+}
+
+/* ---------- Orders: queue → order workspace ---------- */
+.orders-view,
+.order-ws,
+.ow-stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.ws-tabs {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.merchant-count.is-alert {
+  background: #ffd9cf;
+  color: #9c2d12;
+}
+
+.orders-toolbar {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.orders-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.orders-filters select {
+  flex: none;
+  width: auto;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card-strong);
+}
+
+.orders-search {
+  flex: 1;
+  min-width: min(360px, 100%);
+}
+
+.orders-table {
+  display: grid;
+}
+
+.orders-row {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1.2fr) minmax(0, 1.4fr) 140px minmax(0, 1fr);
+  align-items: center;
+  gap: 0.85rem;
+  width: 100%;
+  padding: 0.7rem 0.5rem;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+button.orders-row:hover {
+  background: var(--card-strong);
+}
+
+.orders-head {
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: default;
+}
+
+.orders-cell-order,
+.orders-cell-stack {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.orders-cell-stack > *,
+.orders-cell-order > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.orders-cell-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.orders-flag {
+  font-size: 0.7rem;
+}
+
+.orders-empty {
+  display: grid;
+  gap: 0.25rem;
+  padding: 2rem 0.5rem;
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+.orders-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 0.75rem;
+}
+
+.orders-pager {
+  display: flex;
+  gap: 0.35rem;
+}
+
+/* Order workspace */
+.order-ws-header {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.order-ws-topline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.order-ws-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.order-ws-title h2 {
+  margin: 0 0.25rem 0 0;
+}
+
+.order-ws-title .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.order-ws-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.order-ws-facts dt,
+.ow-dl dt {
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.order-ws-facts dd,
+.ow-dl dd {
+  margin: 0.15rem 0 0;
+  font-weight: 600;
+}
+
+.order-ws-contacts,
+.ow-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.order-ws-sections {
+  border-top: 1px solid var(--line);
+  padding-top: 0.75rem;
+}
+
+.ow-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.ow-heading {
+  margin: 0.15rem 0 0.6rem;
+}
+
+.ow-steps {
+  display: grid;
+  gap: 0.15rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ow-step {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+}
+
+.ow-step.is-pending .ow-step-label {
+  color: var(--ink-soft);
+}
+
+.ow-step-done {
+  color: var(--positive);
+}
+
+.ow-step-active {
+  color: var(--primary);
+}
+
+.ow-step-pending {
+  color: rgba(16, 39, 36, 0.25);
+}
+
+.ow-ok {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--positive);
+  font-weight: 600;
+}
+
+.ow-issues,
+.ow-summary-list,
+.ow-items,
+.ow-activity {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ow-issues li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 12px;
+  background: rgba(255, 90, 54, 0.08);
+  color: #8f2e15;
+}
+
+.ow-issues li > div,
+.ow-summary-list li > span:nth-child(2) {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.ow-summary-list li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.ow-link-button {
+  margin-top: 0.75rem;
+}
+
+.ow-kitchen {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.ow-kitchen-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 0.75rem;
+}
+
+.ow-kitchen-head .ow-heading {
+  margin-bottom: 0.15rem;
+}
+
+.ow-kitchen-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.25rem;
+}
+
+.ow-items li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px dashed var(--line);
+}
+
+.ow-subtotal {
+  display: flex;
+  justify-content: space-between;
+  margin: 0.6rem 0 0;
+}
+
+.ow-actions button,
+.ow-actions a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.ow-kitchen > .ow-actions {
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+
+.ow-actions select {
+  min-width: 240px;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.ow-dispatch {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.ow-assign {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.ow-dl {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0 0 0.85rem;
+}
+
+.ow-subkicker {
+  margin-top: 1rem;
+}
+
+.ow-activity li {
+  display: grid;
+  grid-template-columns: 150px 12px 1fr;
+  align-items: start;
+  gap: 0.6rem;
+}
+
+.ow-activity li > span:last-child {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.ow-activity-time {
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}
+
+.ow-activity-dot {
+  width: 10px;
+  height: 10px;
+  margin-top: 0.3rem;
+  border-radius: 50%;
+  background: var(--primary);
+}
+
+@media (max-width: 900px) {
+  .orders-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .orders-head {
+    display: none;
+  }
+
+  .orders-row > :nth-child(3),
+  .orders-row > :nth-child(4) {
+    display: none;
+  }
+
+  .ow-activity li {
+    grid-template-columns: 1fr;
+  }
+
+  .ow-activity-dot {
+    display: none;
+  }
 }

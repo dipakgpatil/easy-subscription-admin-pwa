@@ -59,11 +59,32 @@ export type AdminOrderListItem = {
   issue_flags: string[]
 }
 
+export type AdminOrderCounts = {
+  open: number
+  completed: number
+  cancelled: number
+  all: number
+  attention: number
+}
+
 export type AdminOrderSearchResult = {
   total: number
   page: number
   page_size: number
   items: AdminOrderListItem[]
+  counts?: AdminOrderCounts
+}
+
+export type AdminOrderStatusGroup = 'OPEN' | 'COMPLETED' | 'CANCELLED' | 'ALL'
+
+export type AdminOrderActivity = {
+  id: number
+  occurred_at: string | null
+  event_type: string
+  label: string
+  actor_name: string | null
+  subject: string
+  details: Record<string, string | number | boolean | null>
 }
 
 export type AdminOrderCreatedEvent = {

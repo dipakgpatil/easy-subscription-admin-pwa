@@ -31,6 +31,8 @@ import type {
   AdminMerchantMenuItem,
   AdminCatalogProductRow,
   MerchantUpdateInput,
+  AdminOrderActivity,
+  AdminOrderStatusGroup,
 } from './types'
 
 const PRODUCTION_ADMIN_ORIGIN = 'https://admin.cravix.co.in'
@@ -272,7 +274,7 @@ type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
   token?: string
   body?: unknown
-  query?: Record<string, string | number | undefined>
+  query?: Record<string, string | number | boolean | undefined>
   credentials?: RequestCredentials
 }
 
@@ -795,6 +797,12 @@ export async function searchOrders(
     query?: string
     status?: string
     zoneCode?: string
+    statusGroup?: AdminOrderStatusGroup
+    attention?: boolean
+    placedFrom?: string
+    placedTo?: string
+    paymentStatus?: string
+    sort?: 'NEWEST' | 'OLDEST'
   } = {},
 ): Promise<AdminOrderSearchResult> {
   return request<AdminOrderSearchResult>('/admin/orders', {
@@ -805,6 +813,10 @@ export async function searchOrders(
 
 export async function getOrderDetail(token: string, woNo: number): Promise<AdminOrderDetail> {
   return request<AdminOrderDetail>(`/admin/orders/${woNo}`, { token })
+}
+
+export async function getOrderActivity(token: string, woNo: number): Promise<AdminOrderActivity[]> {
+  return request<AdminOrderActivity[]>(`/admin/orders/${woNo}/activity`, { token })
 }
 
 export async function updateOrderStatus(

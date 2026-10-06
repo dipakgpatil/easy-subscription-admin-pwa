@@ -101,3 +101,20 @@ adds products from a searchable catalog (`/admin/catalog/products/search`) or cr
 one straight onto the menu. Provisioning upserts by email, so the create form refuses an email
 that already belongs to a merchant. The Catalog tab now only creates products and reviews
 merchant submissions.
+
+## Orders (`src/features/orders/`)
+
+`OrdersView` is a queue: it opens on **Open** orders, oldest first, with tabs and counts for
+Needs attention, Completed, Cancelled and All, one search box (order #, customer, phone, email,
+kitchen, rider) and Placed / Payment / Sort filters, all resolved by `GET /admin/orders`
+(`statusGroup`, `attention`, `placedFrom`/`placedTo`, `paymentStatus`, `sort`). It refreshes the
+open queue every 30 s while visible, and on the app's Refresh button or a new-order alert
+(`refreshSignal`). Other screens open an order by setting the app's `selectedOrderNo`, which
+`OrdersView` consumes once (`requestedOrderNo`), so a list refresh can no longer close it.
+
+`OrderWorkspace` shows one order: a header with the key facts and call buttons, then one section
+at a time: Overview (journey, issues linked to the section that fixes them, kitchen summary),
+Kitchens (items, progress, next-step buttons), Delivery & rider (address, dispatch, rider,
+assignment; riders load only when this opens), Customer & payment, and Activity (loaded on
+demand). Shared formatting lives in `src/lib/format.ts`; the call button in
+`src/lib/ContactAction.tsx`.
