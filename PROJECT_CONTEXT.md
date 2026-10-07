@@ -118,3 +118,23 @@ Kitchens (items, progress, next-step buttons), Delivery & rider (address, dispat
 assignment; riders load only when this opens), Customer & payment, and Activity (loaded on
 demand). Shared formatting lives in `src/lib/format.ts`; the call button in
 `src/lib/ContactAction.tsx`.
+
+## Live updates (`src/lib/liveEvents.ts`)
+
+`connectAdminOrderStream` reads `order.created`, `order.updated` and `rider.updated` from
+`GET /admin/orders/stream`. `App` fans the updates out through `LiveEventsContext`; screens
+subscribe with `useLiveEvent('order' | 'rider', handler)`: the orders list reloads quietly once per
+burst, an open order reloads when its number arrives, and the riders list patches rows in place.
+Every screen keeps its periodic refresh as the fallback: never rely on the stream alone.
+
+## Riders (`src/features/riders/`)
+
+List first (state tabs with counts, search, New rider), then `RiderWorkspace`: live state,
+current order (opens it in Orders), recent orders (`/admin/orders?riderUid=`), profile, zones,
+Suspend/Activate. Creating a rider upserts by email, so the form refuses an email already in use.
+
+## Design layer
+
+Inter (`@fontsource-variable/inter`, bundled so the CSP `font-src 'self'` holds) replaced the
+Segoe UI stack, which fell back to Verdana on macOS. The last section of `App.css` sets the type
+scale, control sizes, badges and cards for the whole admin; add global styling there.

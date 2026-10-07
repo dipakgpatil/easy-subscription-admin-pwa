@@ -94,6 +94,21 @@ export type AdminOrderCreatedEvent = {
   order_placed_on: string | null
 }
 
+export type AdminOrderUpdatedEvent = {
+  order_no: number
+  order_status: string | null
+}
+
+export type AdminRiderUpdatedEvent = {
+  rider_uid: number
+  display_name: string | null
+  status_cd: string | null
+  availability_status: string | null
+  latitude: number | null
+  longitude: number | null
+  location_updated_at: string | null
+}
+
 export type AdminParty = {
   name: string | null
   mobile_no: string | null

@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
+import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import {
   BellRing,
@@ -15,6 +15,7 @@ import AdministratorsView from './features/administrators/AdministratorsView'
 import RidersView from './features/riders/RidersView'
 import ComplianceView from './features/compliance/ComplianceView'
 import { badgeTone, formatDateTime, formatMoney, formatRelativeStatus } from './lib/format'
+import { createLiveBus, LiveEventsContext } from './lib/liveEvents'
 import McpConnectView from './features/mcp/McpConnectView'
 import MerchantsView from './features/merchants/MerchantsView'
 import OrdersView from './features/orders/OrdersView'
@@ -36,9 +37,7 @@ import {
   getReferralAnalytics,
   getReferralConfig,
   getReferralList,
-  getRiders,
   listProductSubmissions,
-  listServiceZones,
   loginAdminWithMockGoogleProfile,
   markMerchantPayoutPaid,
   rejectProductSubmission,
@@ -68,10 +67,8 @@ import type {
   AdminReferralAnalytics,
   AdminReferralConfig,
   AdminReferralListResult,
-  AdminRiderListResult,
   AdminSession,
   AdminProductSubmission,
-  AdminServiceZone,
   AdminWalletCreditResponse,
 } from './lib/types'
 
@@ -137,13 +134,12 @@ function App() {
   const [loginMode, setLoginMode] = useState<LoginMode>('google')
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null)
   const [orderHistory, setOrderHistory] = useState<AdminOrderHistory | null>(null)
-  const [serviceZones, setServiceZones] = useState<AdminServiceZone[]>([])
   const [productSubmissions, setProductSubmissions] = useState<AdminProductSubmission[]>([])
   const [catalogProduct, setCatalogProduct] = useState<CatalogProductDraft>(EMPTY_CATALOG_PRODUCT)
   const [catalogResult, setCatalogResult] = useState<string | null>(null)
   const [selectedOrderNo, setSelectedOrderNo] = useState<number | null>(null)
   const [ordersRefreshSignal, setOrdersRefreshSignal] = useState(0)
-  const [riders, setRiders] = useState<AdminRiderListResult | null>(null)
+  const liveBus = useMemo(() => createLiveBus(), [])
   const [payouts, setPayouts] = useState<AdminMerchantPayoutSummaryResult | null>(null)
   const [referralConfig, setReferralConfig] = useState<AdminReferralConfig | null>(null)
   const [referralAnalytics, setReferralAnalytics] = useState<AdminReferralAnalytics | null>(null)
@@ -261,26 +257,10 @@ function App() {
     if (!session) {
       return
     }
-    const [zones, submissions] = await Promise.all([
-      listServiceZones(),
-      listProductSubmissions(session.access_token),
-    ])
-    setServiceZones(zones)
-    setProductSubmissions(submissions)
+    setProductSubmissions(await listProductSubmissions(session.access_token))
   }, [session])
 
 
-  const loadRiders = useCallback(async () => {
-    if (!session) {
-      return
-    }
-    const [payload, zones] = await Promise.all([
-      getRiders(session.access_token),
-      listServiceZones(),
-    ])
-    setRiders(payload)
-    setServiceZones(zones)
-  }, [session])
 
   const loadPayouts = useCallback(async () => {
     if (!session) {
@@ -335,7 +315,7 @@ function App() {
     if (!session) {
       return false
     }
-    if (activeTab === 'merchants' || activeTab === 'errors' || activeTab === 'security' || activeTab === 'dispatch' || activeTab === 'search' || activeTab === 'operations' || activeTab === 'administrators') {
+    if (activeTab === 'merchants' || activeTab === 'riders' || activeTab === 'errors' || activeTab === 'security' || activeTab === 'dispatch' || activeTab === 'search' || activeTab === 'operations' || activeTab === 'administrators') {
       return false
     }
     setLastError(null)
@@ -346,9 +326,6 @@ function App() {
       }
       if (activeTab === 'history') {
         await loadOrderHistory()
-      }
-      if (activeTab === 'riders') {
-        await loadRiders()
       }
       if (activeTab === 'payouts') {
         await loadPayouts()
@@ -373,7 +350,6 @@ function App() {
     loadOrderHistory,
     loadPayouts,
     loadReferralAdmin,
-    loadRiders,
     loadSelectedPayout,
     session,
   ])
@@ -405,8 +381,10 @@ function App() {
         setOrdersRefreshSignal((current) => current + 1)
         void refreshActiveViewRef.current()
       },
+      onOrderUpdated: (event) => liveBus.emit('order', event),
+      onRiderUpdated: (event) => liveBus.emit('rider', event),
     })
-  }, [session, zoneFilter])
+  }, [liveBus, session, zoneFilter])
 
   async function handleManualRefresh() {
     if (isRefreshing) return
@@ -767,7 +745,6 @@ function App() {
     setCatalogProduct(EMPTY_CATALOG_PRODUCT)
     setCatalogResult(null)
     setSelectedOrderNo(null)
-    setRiders(null)
     setPayouts(null)
     setSelectedMerchantUid(null)
     setSelectedPayout(null)
@@ -920,6 +897,7 @@ function App() {
   }
 
   return (
+    <LiveEventsContext.Provider value={liveBus}>
     <main className={sidebarCollapsed ? 'app-shell sidebar-is-collapsed' : 'app-shell'}>
       <aside className="sidebar">
         <div className="sidebar-brand">
@@ -987,7 +965,7 @@ function App() {
               {activeTab === 'catalog' && 'Catalog and product review'}
               {activeTab === 'orders' && 'Orders'}
               {activeTab === 'history' && 'Completed order history'}
-              {activeTab === 'riders' && 'Rider live operations'}
+              {activeTab === 'riders' && 'Riders'}
               {activeTab === 'compliance' && 'Partner compliance'}
               {activeTab === 'payouts' && 'Merchant payout desk'}
               {activeTab === 'referrals' && 'Referral campaign desk'}
@@ -1021,9 +999,9 @@ function App() {
                 Live {formatDateTime(dashboard.generated_at)}
               </span>
             ) : null}
-            <span className={`stream-indicator is-${streamStatus}`} title="New orders are delivered through an authenticated live stream; automatic refresh remains enabled as a fallback.">
+            <span className={`stream-indicator is-${streamStatus}`} title="Orders and riders update live through an authenticated stream; automatic refresh stays on as a fallback.">
               {streamStatus === 'live' ? <Wifi aria-hidden="true" /> : <WifiOff aria-hidden="true" />}
-              {streamStatus === 'live' ? 'Alerts live' : 'Reconnecting alerts'}
+              {streamStatus === 'live' ? 'Live' : streamStatus === 'connecting' ? 'Connecting…' : 'Reconnecting…'}
             </span>
             {activeTab !== 'merchants' && activeTab !== 'errors' && activeTab !== 'security' && activeTab !== 'dispatch' && activeTab !== 'search' && activeTab !== 'operations' && activeTab !== 'administrators' ? (
               <button className="ghost-button refresh-button" onClick={() => void handleManualRefresh()} disabled={isRefreshing}>
@@ -1371,12 +1349,7 @@ function App() {
         ) : null}
 
         {activeTab === 'riders' ? (
-          <RidersView
-            token={session.access_token}
-            riders={riders}
-            serviceZones={serviceZones}
-            onRefresh={loadRiders}
-          />
+          <RidersView token={session.access_token} onOpenOrder={openOrderNo} />
         ) : null}
 
         {activeTab === 'payouts' ? (
@@ -1811,6 +1784,7 @@ function App() {
         ) : null}
       </section>
     </main>
+    </LiveEventsContext.Provider>
   )
 }
 

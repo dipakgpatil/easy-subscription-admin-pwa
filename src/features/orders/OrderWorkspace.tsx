@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 
 import { getOrderDetail, getRiders, updateOrderStatus } from '../../lib/api'
+import { useLiveEvent } from '../../lib/liveEvents'
 import type { AdminOrderDetail, AdminRiderListItem } from '../../lib/types'
 import { badgeTone, formatMoney } from '../../lib/format'
 import { ContactAction } from '../../lib/ContactAction'
@@ -64,7 +65,12 @@ export default function OrderWorkspace({ token, orderNo, onBack, onChanged, onSe
     void load()
   }, [load])
 
-  // Open orders keep moving; refresh them quietly while on screen.
+  // This order changed somewhere (kitchen, rider, dispatch, another admin).
+  useLiveEvent('order', (event) => {
+    if (event.order_no === orderNo) void load()
+  })
+
+  // Fallback: open orders keep moving; refresh them quietly while on screen.
   useEffect(() => {
     if (!order || isFinished(order.order_status)) return
     const timer = window.setInterval(() => {
@@ -151,7 +157,10 @@ export default function OrderWorkspace({ token, orderNo, onBack, onChanged, onSe
         <dl className="order-ws-facts">
           <div>
             <dt>Placed</dt>
-            <dd>{formatTime(order.order_placed_on)}{finished ? '' : ` · ${orderAge(order.order_placed_on)} ago`}</dd>
+            <dd>
+              {formatTime(order.order_placed_on)}
+              {finished ? null : <small>{orderAge(order.order_placed_on)} ago</small>}
+            </dd>
           </div>
           <div>
             <dt>Stage</dt>

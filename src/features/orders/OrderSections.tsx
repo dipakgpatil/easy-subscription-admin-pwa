@@ -5,7 +5,7 @@ import { getOrderActivity } from '../../lib/api'
 import type { AdminOrderActivity, AdminOrderDetail, AdminRiderListItem, AdminTimelineStep } from '../../lib/types'
 import { badgeTone, formatMoney } from '../../lib/format'
 import { ContactAction } from '../../lib/ContactAction'
-import { ACTION_LABELS, ISSUES, formatTime, nextSteps, stageLabel, type OrderSection } from './orderUtils'
+import { ACTION_LABELS, ISSUES, formatTime, nextSteps, stageLabel, stepLabel, type OrderSection } from './orderUtils'
 
 function StepIcon({ step }: { step: AdminTimelineStep }) {
   const status = step.status.toUpperCase()
@@ -14,13 +14,13 @@ function StepIcon({ step }: { step: AdminTimelineStep }) {
   return <CircleDot size={16} className="ow-step-pending" aria-hidden="true" />
 }
 
-function Steps({ steps }: { steps: AdminTimelineStep[] }) {
+function Steps({ steps, kitchens = 1 }: { steps: AdminTimelineStep[]; kitchens?: number }) {
   return (
     <ol className="ow-steps">
       {steps.map((step) => (
         <li key={step.label} className={`ow-step is-${step.status.toLowerCase().replaceAll('_', '-')}`}>
           <StepIcon step={step} />
-          <span className="ow-step-label">{step.label}</span>
+          <span className="ow-step-label">{stepLabel(step.label, kitchens)}</span>
           <span className="muted-line">
             {step.timestamp ? formatTime(step.timestamp) : step.status.toUpperCase().startsWith('IN') ? 'in progress' : ''}
           </span>
@@ -36,7 +36,11 @@ export function OverviewSection({ order, onOpenSection }: { order: AdminOrderDet
       <section className="panel">
         <p className="section-kicker">Journey</p>
         <h3 className="ow-heading">{stageLabel(order.journey, order.order_status)}</h3>
-        {order.journey ? <Steps steps={order.journey.steps} /> : <p className="muted-line">No journey recorded.</p>}
+        {order.journey ? (
+          <Steps steps={order.journey.steps} kitchens={order.fulfillment_groups.length} />
+        ) : (
+          <p className="muted-line">No journey recorded.</p>
+        )}
       </section>
 
       <div className="ow-stack">

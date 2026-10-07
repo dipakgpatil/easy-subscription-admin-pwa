@@ -33,6 +33,8 @@ import type {
   MerchantUpdateInput,
   AdminOrderActivity,
   AdminOrderStatusGroup,
+  AdminOrderUpdatedEvent,
+  AdminRiderUpdatedEvent,
 } from './types'
 
 const PRODUCTION_ADMIN_ORIGIN = 'https://admin.cravix.co.in'
@@ -335,6 +337,8 @@ type AdminOrderStreamOptions = {
   token: string
   zoneCode?: string
   onOrderCreated: (event: AdminOrderCreatedEvent) => void
+  onOrderUpdated?: (event: AdminOrderUpdatedEvent) => void
+  onRiderUpdated?: (event: AdminRiderUpdatedEvent) => void
   onStatusChange: (status: AdminOrderStreamStatus) => void
   onAuthenticationExpired: () => void
 }
@@ -367,6 +371,32 @@ function normalizeNewOrderEvent(payload: unknown): AdminOrderCreatedEvent | null
     service_zone_code: typeof record.service_zone_code === 'string' ? record.service_zone_code : null,
     service_zone_name: typeof record.service_zone_name === 'string' ? record.service_zone_name : null,
     order_placed_on: typeof record.order_placed_on === 'string' ? record.order_placed_on : null,
+  }
+}
+
+function normalizeOrderUpdate(payload: unknown): AdminOrderUpdatedEvent | null {
+  if (!payload || typeof payload !== 'object') return null
+  const record = payload as Record<string, unknown>
+  const orderNo = Number(record.order_no)
+  if (!Number.isSafeInteger(orderNo) || orderNo < 1) return null
+  return { order_no: orderNo, order_status: typeof record.order_status === 'string' ? record.order_status : null }
+}
+
+function normalizeRiderUpdate(payload: unknown): AdminRiderUpdatedEvent | null {
+  if (!payload || typeof payload !== 'object') return null
+  const record = payload as Record<string, unknown>
+  const riderUid = Number(record.rider_uid)
+  if (!Number.isSafeInteger(riderUid) || riderUid < 1) return null
+  const text = (key: string) => (typeof record[key] === 'string' ? (record[key] as string) : null)
+  const number = (key: string) => (typeof record[key] === 'number' && Number.isFinite(record[key]) ? (record[key] as number) : null)
+  return {
+    rider_uid: riderUid,
+    display_name: text('display_name'),
+    status_cd: text('status_cd'),
+    availability_status: text('availability_status'),
+    latitude: number('latitude'),
+    longitude: number('longitude'),
+    location_updated_at: text('location_updated_at'),
   }
 }
 
@@ -425,10 +455,18 @@ export function connectAdminOrderStream(options: AdminOrderStreamOptions): () =>
           frameBoundary = buffer.indexOf('\n\n')
           if (!frame) continue
           if (frame.id) lastEventId = frame.id
-          if (frame.event !== 'order.created') continue
           try {
-            const orderEvent = normalizeNewOrderEvent(JSON.parse(frame.data))
-            if (orderEvent) options.onOrderCreated(orderEvent)
+            const data: unknown = JSON.parse(frame.data)
+            if (frame.event === 'order.created') {
+              const orderEvent = normalizeNewOrderEvent(data)
+              if (orderEvent) options.onOrderCreated(orderEvent)
+            } else if (frame.event === 'order.updated') {
+              const update = normalizeOrderUpdate(data)
+              if (update) options.onOrderUpdated?.(update)
+            } else if (frame.event === 'rider.updated') {
+              const update = normalizeRiderUpdate(data)
+              if (update) options.onRiderUpdated?.(update)
+            }
           } catch {
             // A malformed realtime message is ignored; regular polling still reconciles orders.
           }
@@ -802,6 +840,8 @@ export async function searchOrders(
     placedFrom?: string
     placedTo?: string
     paymentStatus?: string
+    riderUid?: number
+    merchantUid?: number
     sort?: 'NEWEST' | 'OLDEST'
   } = {},
 ): Promise<AdminOrderSearchResult> {

@@ -2,6 +2,7 @@ import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'reac
 import { ChevronLeft, ChevronRight, LoaderCircle, RefreshCw, Search, TriangleAlert } from 'lucide-react'
 
 import { searchOrders } from '../../lib/api'
+import { useLiveEvent } from '../../lib/liveEvents'
 import type { AdminOrderListItem, AdminOrderSearchResult, AdminOrderStatusGroup } from '../../lib/types'
 import { badgeTone, formatMoney } from '../../lib/format'
 import OrderWorkspace from './OrderWorkspace'
@@ -91,7 +92,20 @@ export default function OrdersView({ token, zoneCode, requestedOrderNo, onReques
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshSignal])
 
-  // Keep the open queue current without hammering the API: only while visible.
+  // Live order changes: one quiet reload per burst of events.
+  const liveReload = useRef<number | null>(null)
+  useLiveEvent('order', () => {
+    if (openOrderNo !== null || liveReload.current !== null) return
+    liveReload.current = window.setTimeout(() => {
+      liveReload.current = null
+      void load(true)
+    }, 800)
+  })
+  useEffect(() => () => {
+    if (liveReload.current !== null) window.clearTimeout(liveReload.current)
+  }, [])
+
+  // Fallback refresh for the open queue (live events may drop): only while visible.
   useEffect(() => {
     if (openOrderNo !== null || (tab !== 'OPEN' && tab !== 'ATTENTION')) return
     const timer = window.setInterval(() => {

@@ -118,3 +118,23 @@ export function stageLabel(journey: { current_stage: string; steps: { label: str
   if (step && step.status.toUpperCase().startsWith('IN')) return IN_PROGRESS_STAGE[step.label] ?? journey.current_stage
   return journey.current_stage
 }
+
+/** Plain wording for journey and kitchen steps (the API keeps its own labels). */
+const STEP_LABELS: Record<string, string> = {
+  'order placed': 'Order placed',
+  'merchants accepted': 'Kitchen accepted',
+  'merchant accepted': 'Kitchen accepted',
+  'products being prepared': 'Preparing',
+  preparing: 'Preparing',
+  'all merchant orders ready': 'Ready for pickup',
+  'ready for pickup': 'Ready for pickup',
+  'rider assigned': 'Rider assigned',
+  'pickup in progress': 'Picked up',
+  'in transit': 'On the way',
+  delivered: 'Delivered',
+}
+
+export function stepLabel(label: string, kitchens = 1): string {
+  const friendly = STEP_LABELS[label.trim().toLowerCase()] ?? label
+  return kitchens > 1 && friendly === 'Kitchen accepted' ? 'Kitchens accepted' : friendly
+}
