@@ -10,6 +10,8 @@ import type {
   AdminOrderDetail,
   AdminOrderCreatedEvent,
   AdminOrderSearchResult,
+  AdminRiderSettlementView,
+  RiderSettlementMethod,
   OperationalEventResult,
   ObservabilitySummary,
   AdminReferralAnalytics,
@@ -935,6 +937,28 @@ export async function updateRider(
       vehicle_type: payload.vehicleType,
       default_payout_amount: payload.defaultPayoutAmount,
       serviceZoneCodes: payload.serviceZoneCodes,
+    },
+  })
+}
+
+export async function getRiderSettlement(token: string, riderUid: number): Promise<AdminRiderSettlementView> {
+  return request<AdminRiderSettlementView>(`/admin/riders/${encodeURIComponent(String(riderUid))}/settlement`, { token })
+}
+
+/** Settles everything pending for the rider. Refused (409) if the net changed since it was reviewed. */
+export async function settleRider(
+  token: string,
+  riderUid: number,
+  settlement: { paymentMethod: RiderSettlementMethod; reference?: string; note?: string; expectedNetAmount: string },
+): Promise<AdminRiderSettlementView> {
+  return request<AdminRiderSettlementView>(`/admin/riders/${encodeURIComponent(String(riderUid))}/settlements`, {
+    method: 'POST',
+    token,
+    body: {
+      payment_method: settlement.paymentMethod,
+      reference: settlement.reference?.trim() || null,
+      note: settlement.note?.trim() || null,
+      expected_net_amount: settlement.expectedNetAmount,
     },
   })
 }

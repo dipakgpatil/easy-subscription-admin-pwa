@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, ExternalLink, LayoutDashboard, LoaderCircle, Map as MapIcon, MapPin, Save, ShieldCheck, ShieldOff, UserRound } from 'lucide-react'
+import { ArrowLeft, ExternalLink, LayoutDashboard, LoaderCircle, Map as MapIcon, MapPin, Save, ShieldCheck, ShieldOff, UserRound, Wallet } from 'lucide-react'
 
 import { searchOrders, updateRider, updateRiderStatus } from '../../lib/api'
 import { ContactAction } from '../../lib/ContactAction'
 import { badgeTone, formatMoney } from '../../lib/format'
 import type { AdminOrderListItem, AdminRiderListItem, AdminServiceZone } from '../../lib/types'
 import { formatTime } from '../orders/orderUtils'
+import RiderPayouts from './RiderPayouts'
 import { locationIsFresh, riderBucket, seenAgo, vehicleLabel, VEHICLES } from './riderUtils'
 
-type Section = 'overview' | 'profile' | 'zones'
+type Section = 'overview' | 'payouts' | 'profile' | 'zones'
 
 type Props = {
   token: string
@@ -74,7 +75,7 @@ export default function RiderWorkspace({ token, rider, zones, onBack, onChanged,
           <div><dt>Location</dt><dd>{rider.location_updated_at ? seenAgo(rider.location_updated_at) : 'Never shared'}</dd></div>
           <div><dt>Current order</dt><dd>{rider.active_order_no ? `#${rider.active_order_no}` : 'None'}</dd></div>
           <div><dt>Payout per order</dt><dd>{formatMoney(rider.default_payout_amount)}</dd></div>
-          <div><dt>Pending payout</dt><dd>{formatMoney(rider.pending_payout_amount)}</dd></div>
+          <div><dt>Unsettled earnings</dt><dd>{formatMoney(rider.pending_payout_amount)}</dd></div>
         </dl>
         <div className="order-ws-contacts">
           <ContactAction label={rider.display_name} mobileNo={rider.mobile_no} />
@@ -82,6 +83,7 @@ export default function RiderWorkspace({ token, rider, zones, onBack, onChanged,
         <nav className="ws-tabs order-ws-sections" aria-label="Rider sections">
           {[
             { key: 'overview' as const, label: 'Overview', icon: LayoutDashboard },
+            { key: 'payouts' as const, label: 'Payouts', icon: Wallet },
             { key: 'profile' as const, label: 'Profile', icon: UserRound },
             { key: 'zones' as const, label: 'Delivery zones', icon: MapIcon },
           ].map(({ key, label, icon: Icon }) => (
@@ -101,6 +103,7 @@ export default function RiderWorkspace({ token, rider, zones, onBack, onChanged,
       {message ? <p className="success-banner">{message}</p> : null}
 
       {section === 'overview' ? <RiderOverview token={token} rider={rider} onOpenOrder={onOpenOrder} /> : null}
+      {section === 'payouts' ? <RiderPayouts token={token} rider={rider} onSettled={onChanged} /> : null}
       {section === 'profile' ? <RiderProfileForm token={token} rider={rider} onSaved={onChanged} /> : null}
       {section === 'zones' ? <RiderZonesForm token={token} rider={rider} zones={zones} onSaved={onChanged} /> : null}
     </section>

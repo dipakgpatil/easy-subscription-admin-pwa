@@ -4313,3 +4313,28 @@ label {
     margin-left: 0;
   }
 }
+
+/* Rider payouts: credits to the rider in green, cash owed by them in amber. */
+.payout-form {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.payout-items li > span:first-child {
+  min-width: 3.25rem;
+}
+
+.payout-amount {
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.payout-amount.is-credit {
+  color: #1c7c3a;
+}
+
+.payout-amount.is-debit {
+  color: #9a5b00;
+}

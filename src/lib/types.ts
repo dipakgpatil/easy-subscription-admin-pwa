@@ -676,3 +676,43 @@ export type MerchantUpdateInput = Partial<{
   latitude: number | null
   longitude: number | null
 }>
+
+/** Earnings Cravix owes a rider and the cash-on-delivery money they hold. */
+export type RiderSettlementBalance = {
+  earnings_amount: string
+  deliveries_count: number
+  cash_collected_amount: string
+  cash_orders_count: number
+  /** earnings - cash. Positive: pay the rider. Negative: collect from the rider. */
+  net_amount: string
+}
+
+export type RiderSettlement = {
+  settlement_id: number
+  settled_at: string
+  earnings_amount: string
+  cash_collected_amount: string
+  net_amount: string
+  deliveries_count: number
+  cash_orders_count: number
+  payment_method: RiderSettlementMethod
+  reference: string | null
+  note: string | null
+}
+
+export type RiderSettlementMethod = 'UPI' | 'BANK_TRANSFER' | 'CASH' | 'OTHER'
+
+export type AdminRiderSettlementItem = {
+  kind: 'EARNING' | 'CASH'
+  order_no: number
+  amount: string
+  occurred_on: string
+}
+
+export type AdminRiderSettlementView = {
+  rider_uid: number
+  rider_name: string | null
+  pending: RiderSettlementBalance
+  pending_items: AdminRiderSettlementItem[]
+  settlements: RiderSettlement[]
+}
