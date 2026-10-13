@@ -6,6 +6,7 @@ import type { AdminCheckoutCharges } from '../src/lib/types.ts'
 import {
   computeBill,
   draftChanges,
+  gstNote,
   draftErrors,
   draftFromCharges,
   formatRate,
@@ -181,4 +182,10 @@ test('a zone without a fee stays blank until set, and previews the standard char
   assert.equal(bill.totalAmount, 25500)
   assert.match(bill.lines.find((line) => line.code === 'DELIVERY')?.note ?? '', /standard delivery charge/)
   assert.equal(computeBill(DEFAULTS, ORDER).deliveryUnset, false)
+})
+
+test('the GST note names only the parts that carry GST, as the customer bill does', () => {
+  assert.equal(gstNote(500, 1800, 1050, 630), '5% on food, 18% on delivery and platform fees')
+  assert.equal(gstNote(500, 1800, 0, 630), '18% on delivery and platform fees')
+  assert.equal(gstNote(500, 1800, 1050, 0), '5% on food')
 })

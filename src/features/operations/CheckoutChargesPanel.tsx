@@ -416,7 +416,11 @@ export default function CheckoutChargesPanel({ token }: { token: string }) {
                     {bill.lines.filter((line) => line.code === 'DISCOUNT').map((line) => billLine(line, bill.deliveryUnset))}
                   </ul>
                   <div className="charges-total">
-                    <span>{bill.deliveryUnset ? 'To pay, plus the standard delivery charge' : 'To pay'}</span>
+                    <span>{bill.deliveryUnset
+                      ? settings?.gstEnabled
+                        ? 'To pay, plus the standard delivery charge and its GST'
+                        : 'To pay, plus the standard delivery charge'
+                      : 'To pay'}</span>
                     <strong className="charges-amount">{rupees(bill.totalAmount)}</strong>
                   </div>
                   <p className="charges-hint">

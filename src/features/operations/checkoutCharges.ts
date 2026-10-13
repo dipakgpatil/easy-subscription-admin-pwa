@@ -90,8 +90,14 @@ export function percentOf(amount: number, rate: number): number {
   return Math.floor((amount * rate + 5000) / 10000)
 }
 
-export function gstNote(foodRate: number, feesRate: number): string {
-  return `${formatRate(foodRate)}% on food, ${formatRate(feesRate)}% on delivery and platform fees`
+/** As the customer bill words it: only the parts that actually carry GST. */
+export function gstNote(foodRate: number, feesRate: number, foodGst = 1, feesGst = 1): string {
+  return [
+    foodGst > 0 ? `${formatRate(foodRate)}% on food` : null,
+    feesGst > 0 ? `${formatRate(feesRate)}% on delivery and platform fees` : null,
+  ]
+    .filter(Boolean)
+    .join(', ')
 }
 
 /**
@@ -128,7 +134,7 @@ export function computeBill(settings: ChargeSettings, order: ExampleOrder): Prev
       code: 'GST',
       label: 'GST and taxes',
       amount: taxesAmount,
-      note: gstNote(settings.foodGstRate, settings.feesGstRate),
+      note: gstNote(settings.foodGstRate, settings.feesGstRate, foodGst, feesGst),
     })
   }
   if (discount > 0) {
