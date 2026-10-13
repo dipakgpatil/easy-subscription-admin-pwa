@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ExternalLink, LoaderCircle, MapPin, Save } from 'lucide-react'
 
-import { updateMerchant } from '../../lib/api'
+import { getCheckoutCharges, updateMerchant } from '../../lib/api'
 import type { AdminMerchantProfile, MerchantUpdateInput } from '../../lib/types'
+import { fromHundredths, MAX_FEE, rupees, toHundredths } from '../operations/checkoutCharges'
 import { mapsUrl, parseCoordinates } from './merchantUtils'
 
 type Props = {
@@ -24,6 +25,8 @@ type Draft = {
   address: string
   location: string
   password: string
+  /** Blank uses the checkout default. */
+  packagingFee: string
 }
 
 function draftFrom(merchant: AdminMerchantProfile): Draft {
@@ -40,7 +43,13 @@ function draftFrom(merchant: AdminMerchantProfile): Draft {
     address: merchant.address ?? '',
     location: merchant.latitude != null && merchant.longitude != null ? `${merchant.latitude}, ${merchant.longitude}` : '',
     password: '',
+    packagingFee: merchant.packaging_fee != null ? String(merchant.packaging_fee) : '',
   }
+}
+
+/** Paise of the kitchen's own packaging charge; null when blank (the default applies). */
+function packagingOverride(text: string): number | null {
+  return text.trim() ? toHundredths(text) : null
 }
 
 export default function ProfilePanel({ token, merchant, onSaved }: Props) {
@@ -48,7 +57,23 @@ export default function ProfilePanel({ token, merchant, onSaved }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [defaultPackaging, setDefaultPackaging] = useState<string | null>(null)
   const coordinates = parseCoordinates(draft.location)
+
+  // Only to show the default as the placeholder; the form works without it.
+  useEffect(() => {
+    let active = true
+    getCheckoutCharges(token)
+      .then((charges) => {
+        if (active) setDefaultPackaging(charges.default_packaging_fee)
+      })
+      .catch(() => undefined)
+    return () => {
+      active = false
+    }
+  }, [token])
+
+  const defaultPackagingPaise = defaultPackaging !== null ? toHundredths(defaultPackaging) : null
 
   const field = (key: keyof Draft) => ({
     value: draft[key],
@@ -66,6 +91,12 @@ export default function ProfilePanel({ token, merchant, onSaved }: Props) {
       setError('A new password must be at least 12 characters.')
       return
     }
+    const packaging = packagingOverride(draft.packagingFee)
+    if (draft.packagingFee.trim() && (packaging === null || packaging > MAX_FEE)) {
+      setError('Packaging charge must be an amount from 0 to 500, like 10 or 12.50. Leave it blank to use the default.')
+      return
+    }
+    const packagingChanged = packaging !== packagingOverride(merchant.packaging_fee != null ? String(merchant.packaging_fee) : '')
     const emailChanged = draft.emailAddress.trim().toLowerCase() !== (merchant.email_address ?? '').toLowerCase()
     if (
       emailChanged &&
@@ -87,6 +118,8 @@ export default function ProfilePanel({ token, merchant, onSaved }: Props) {
       ...(draft.fssai ? { fssai_registration_no: draft.fssai } : {}),
       ...(emailChanged ? { email_address: draft.emailAddress.trim().toLowerCase() } : {}),
       ...(draft.password ? { password: draft.password } : {}),
+      // Sent only when changed; null clears the kitchen's own charge.
+      ...(packagingChanged ? { packaging_fee: packaging === null ? null : fromHundredths(packaging) } : {}),
     }
     setBusy(true)
     setError(null)
@@ -163,6 +196,30 @@ export default function ProfilePanel({ token, merchant, onSaved }: Props) {
           New password (blank keeps current)
           <input {...field('password')} type="password" autoComplete="new-password" minLength={12} maxLength={128} />
         </label>
+      </div>
+
+      <div className="panel-head merchant-subhead">
+        <div>
+          <p className="section-kicker">Customer bill</p>
+          <h2>Packaging</h2>
+        </div>
+      </div>
+      <div className="merchant-form-grid">
+        <label>
+          Packaging charge per order (₹)
+          <input
+            {...field('packagingFee')}
+            inputMode="decimal"
+            autoComplete="off"
+            maxLength={10}
+            placeholder={defaultPackagingPaise !== null ? `Default ${rupees(defaultPackagingPaise)}` : 'Use default'}
+          />
+        </label>
+        <p className="muted-line merchant-form-wide">
+          Added once to each order from this kitchen and paid out to it. Leave blank to use the default
+          {defaultPackagingPaise !== null ? ` (${rupees(defaultPackagingPaise)})` : ''} from Operations → Checkout charges;
+          enter 0 for no packaging charge.
+        </p>
       </div>
 
       {error ? <p className="error-banner">{error}</p> : null}

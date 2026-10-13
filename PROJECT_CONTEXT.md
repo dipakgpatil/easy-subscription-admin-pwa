@@ -63,6 +63,7 @@ npm install
 npm run dev
 npm run build
 npm run lint
+npm test
 ```
 
 Use `.env` or `.env.local` with `VITE_API_BASE_URL`, `VITE_GOOGLE_CLIENT_ID`, and `VITE_ALLOW_MOCK_GOOGLE` as needed.
@@ -91,6 +92,15 @@ Never put the access token in that redirect.
 Opens/closes each zone for ordering (with the message and optional opening time customers
 see) and manages customer-app banners with start/expiry. Date inputs are the browser's local
 time, converted to absolute ISO timestamps before they are sent.
+
+**Checkout charges** (`CheckoutChargesPanel.tsx`, `GET`/`PUT /admin/checkout-charges`) edits the
+platform fee, default packaging charge, delivery fee per zone and the GST switch with its food and
+fees rates. Save sends only the changed fields after a confirmation. The live example bill is
+recomputed in `checkoutCharges.ts` in paise with half-up rounding, mirroring the backend's
+`app/services/pricing.py`, which alone computes real bills; keep the two in step. A zone with no fee
+of its own uses the standard DELIVERY charge, which the preview does not know, so it says so. A
+merchant's own packaging charge is in the Merchants profile form (blank = the default; null clears
+the override). `npm test` runs these helpers with Node's test runner (`tests/`).
 
 ## Merchants (`src/features/merchants/`)
 

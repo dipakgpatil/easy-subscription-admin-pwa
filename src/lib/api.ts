@@ -30,6 +30,8 @@ import type {
   SearchAnalyticsSummary,
   AdminOperations,
   AnnouncementInput,
+  AdminCheckoutCharges,
+  CheckoutChargesInput,
   AdminMerchantMenuItem,
   AdminCatalogProductRow,
   MerchantUpdateInput,
@@ -1200,6 +1202,39 @@ export async function updateAnnouncement(
 
 export async function deleteAnnouncement(token: string, id: number): Promise<AdminOperations> {
   return request<AdminOperations>(`/admin/operations/announcements/${id}`, { method: 'DELETE', token })
+}
+
+function decimalText(value: unknown): string {
+  return value === null || value === undefined || value === '' ? '0.00' : String(value)
+}
+
+/** Money and rates as decimal strings and GST as a boolean, whichever way the API spells them. */
+function normalizeCheckoutCharges(payload: AdminCheckoutCharges): AdminCheckoutCharges {
+  const gst = payload.gst_enabled as unknown
+  return {
+    ...payload,
+    platform_fee: decimalText(payload.platform_fee),
+    default_packaging_fee: decimalText(payload.default_packaging_fee),
+    gst_enabled: gst === true || gst === 'Y',
+    food_gst_rate: decimalText(payload.food_gst_rate),
+    fees_gst_rate: decimalText(payload.fees_gst_rate),
+    updated_at: payload.updated_at ?? null,
+    updated_by: payload.updated_by ?? null,
+    zones: (payload.zones ?? []).map((zone) => ({
+      ...zone,
+      delivery_fee: zone.delivery_fee === null || zone.delivery_fee === undefined ? null : String(zone.delivery_fee),
+    })),
+  }
+}
+
+export async function getCheckoutCharges(token: string): Promise<AdminCheckoutCharges> {
+  return normalizeCheckoutCharges(await request<AdminCheckoutCharges>('/admin/checkout-charges', { token }))
+}
+
+export async function updateCheckoutCharges(token: string, payload: CheckoutChargesInput): Promise<AdminCheckoutCharges> {
+  return normalizeCheckoutCharges(
+    await request<AdminCheckoutCharges>('/admin/checkout-charges', { method: 'PUT', token, body: payload }),
+  )
 }
 
 export async function getMerchant(token: string, merchantUid: number): Promise<AdminMerchantProfile> {

@@ -4338,3 +4338,351 @@ label {
 .payout-amount.is-debit {
   color: #9a5b00;
 }
+
+/* Checkout charges (Operations): fees on the left, a live example bill on the right. */
+/* Wraps by the panel's own width, not the viewport, so a narrow workspace stacks too. */
+.charges-layout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1.25rem;
+  margin-top: 0.75rem;
+}
+
+.charges-form {
+  flex: 1.4 1 380px;
+  min-width: 0;
+}
+
+.charges-fieldset {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.charges-group {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.charges-group-title {
+  margin: 0;
+  color: var(--forest);
+  font-size: 0.98rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.charges-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.charges-field {
+  display: grid;
+  gap: 0.3rem;
+  align-content: start;
+}
+
+.charges-input {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 0.75rem;
+  border: 1px solid rgba(16, 39, 36, 0.16);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.charges-input:focus-within {
+  border-color: rgba(255, 90, 54, 0.6);
+  box-shadow: 0 0 0 3px rgba(255, 90, 54, 0.12);
+}
+
+.charges-input.is-invalid {
+  border-color: #d0482b;
+}
+
+.charges-input input,
+.charges-input input:focus {
+  min-width: 0;
+  padding: 0.55rem 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.charges-hint {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.charges-hint.is-error {
+  color: #b13823;
+  font-weight: 600;
+}
+
+.charges-zone-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.charges-zone-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 8.5rem;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.charges-zone-row:first-child {
+  border-top: 0;
+}
+
+.charges-zone-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+.charges-zone-name > span:not(.badge) {
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.charges-zone-note {
+  grid-column: 1 / -1;
+  text-align: right;
+}
+
+.charges-gst-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.charges-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.charges-switch:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.charges-switch-track {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  border-radius: 999px;
+  background: #cfd8d5;
+  transition: background 160ms ease;
+}
+
+.charges-switch-track span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(13, 35, 31, 0.25);
+  transition: transform 160ms ease;
+}
+
+.charges-switch.is-on .charges-switch-track {
+  background: var(--primary);
+}
+
+.charges-switch.is-on .charges-switch-track span {
+  transform: translateX(16px);
+}
+
+.charges-switch:focus-visible {
+  outline: none;
+}
+
+.charges-switch:focus-visible .charges-switch-track {
+  box-shadow: 0 0 0 3px rgba(255, 90, 54, 0.3);
+}
+
+.charges-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid #f4d49a;
+  border-radius: 10px;
+  background: #fff5df;
+  color: #6e4700;
+}
+
+.charges-callout.is-danger {
+  border-color: #fac4bb;
+  background: #fff0ed;
+  color: #8f2e15;
+}
+
+.charges-callout > svg {
+  flex: 0 0 auto;
+  margin-top: 0.1rem;
+}
+
+.charges-callout p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.charges-preview {
+  position: sticky;
+  top: 1rem;
+  flex: 1 1 300px;
+  min-width: 0;
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(18, 32, 28, 0.04);
+}
+
+.charges-preview-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--primary);
+}
+
+.charges-preview-head .section-kicker {
+  margin: 0;
+}
+
+.charges-example {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.charges-example label {
+  gap: 0.3rem;
+  font-size: 0.8rem;
+}
+
+.charges-bill {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0.8rem 0 0;
+  border-top: 1px dashed rgba(16, 39, 36, 0.22);
+  list-style: none;
+}
+
+.charges-bill li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.charges-bill li small {
+  display: block;
+  margin-top: 0.1rem;
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+}
+
+.charges-bill li.is-subtotal {
+  padding-top: 0.55rem;
+  border-top: 1px solid var(--line);
+  font-weight: 600;
+}
+
+.charges-bill li.is-discount {
+  color: #1c7c3a;
+}
+
+.charges-amount {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.charges-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 0.7rem;
+  border-top: 1px dashed rgba(16, 39, 36, 0.22);
+  color: var(--forest);
+  font-weight: 650;
+}
+
+.charges-total strong {
+  font-size: 1.25rem;
+}
+
+.charges-actions,
+.charges-load-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.charges-actions {
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--line);
+}
+
+.charges-load-error {
+  justify-content: flex-start;
+  margin-top: 0.75rem;
+}
+
+.charges-actions > .error-banner,
+.charges-actions > .success-banner {
+  flex: 1 0 100%;
+}
+
+@media (max-width: 900px) {
+  .charges-preview {
+    position: static;
+  }
+}

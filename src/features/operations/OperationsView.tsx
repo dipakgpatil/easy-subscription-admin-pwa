@@ -16,6 +16,7 @@ import type {
   AnnouncementInput,
   AnnouncementTone,
 } from '../../lib/types'
+import CheckoutChargesPanel from './CheckoutChargesPanel'
 
 type Props = { token: string }
 
@@ -432,6 +433,8 @@ export default function OperationsView({ token }: Props) {
           {data && data.announcements.length === 0 ? <p className="muted-line">No banners yet.</p> : null}
         </div>
       </section>
+
+      <CheckoutChargesPanel token={token} />
     </section>
   )
 }

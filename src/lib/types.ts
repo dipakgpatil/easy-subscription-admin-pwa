@@ -270,6 +270,8 @@ export type AdminMerchantProfile = {
   longitude?: number | null
   google_linked?: boolean
   active_product_count?: number
+  /** Packaging charge per order from this kitchen; null uses the checkout default. */
+  packaging_fee?: string | null
 }
 
 export type AdminCatalogProduct = {
@@ -675,6 +677,40 @@ export type MerchantUpdateInput = Partial<{
   address: string | null
   latitude: number | null
   longitude: number | null
+  /** Explicit null clears the override so the checkout default applies. */
+  packaging_fee: string | null
+}>
+
+export type AdminCheckoutChargeZone = {
+  code: string
+  name: string
+  is_active: boolean
+  /** Null when the zone has no fee of its own; checkout then uses the standard DELIVERY charge. */
+  delivery_fee: string | null
+}
+
+/** What every customer bill adds on top of the items. Money is a decimal string in rupees. */
+export type AdminCheckoutCharges = {
+  platform_fee: string
+  default_packaging_fee: string
+  gst_enabled: boolean
+  /** Percent on item total plus packaging. */
+  food_gst_rate: string
+  /** Percent on delivery and platform fees. */
+  fees_gst_rate: string
+  updated_at: string | null
+  updated_by: string | null
+  zones: AdminCheckoutChargeZone[]
+}
+
+/** Any subset; omitted fields are unchanged. */
+export type CheckoutChargesInput = Partial<{
+  platform_fee: string
+  default_packaging_fee: string
+  gst_enabled: boolean
+  food_gst_rate: string
+  fees_gst_rate: string
+  zone_delivery_fees: Record<string, string>
 }>
 
 /** Earnings Cravix owes a rider and the cash-on-delivery money they hold. */
