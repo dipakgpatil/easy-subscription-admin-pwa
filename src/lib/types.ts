@@ -318,7 +318,10 @@ export type AdminMerchantPayoutSummaryResult = {
 }
 
 export type AdminMerchantPayoutOrder = {
+  /** This kitchen's ticket: what mark-paid takes. */
   wo_no: number
+  /** The customer's order number, the one to show. Absent from APIs before it was added. */
+  order_no?: number
   order_status: string
   order_placed_on: string | null
   earned_at: string | null

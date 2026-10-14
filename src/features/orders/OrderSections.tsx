@@ -5,7 +5,18 @@ import { getOrderActivity } from '../../lib/api'
 import type { AdminOrderActivity, AdminOrderDetail, AdminRiderListItem, AdminTimelineStep } from '../../lib/types'
 import { badgeTone, formatMoney } from '../../lib/format'
 import { ContactAction } from '../../lib/ContactAction'
-import { ACTION_LABELS, ISSUES, formatTime, nextSteps, stageLabel, stepLabel, type OrderSection } from './orderUtils'
+import {
+  ACTION_LABELS,
+  ISSUES,
+  formatTime,
+  kitchenCount,
+  kitchenPart,
+  kitchenTicket,
+  nextSteps,
+  stageLabel,
+  stepLabel,
+  type OrderSection,
+} from './orderUtils'
 
 function StepIcon({ step }: { step: AdminTimelineStep }) {
   const status = step.status.toUpperCase()
@@ -77,7 +88,7 @@ export function OverviewSection({ order, onOpenSection }: { order: AdminOrderDet
                 <ChefHat size={16} aria-hidden="true" />
                 <span>
                   <strong>{group.merchant?.display_name ?? 'No kitchen'}</strong>
-                  <span className="muted-line">#{group.wo_no} · {group.items.length} item{group.items.length === 1 ? '' : 's'} · {formatMoney(group.subtotal_amount)}</span>
+                  <span className="muted-line">{group.items.length} item{group.items.length === 1 ? '' : 's'} · {formatMoney(group.subtotal_amount)}</span>
                 </span>
                 <span className={`badge ${badgeTone(group.order_status)}`}>{group.order_status.replaceAll('_', ' ')}</span>
               </li>
@@ -109,7 +120,7 @@ export function KitchensSection({
           <section key={group.wo_no} className="panel ow-kitchen">
             <header className="ow-kitchen-head">
               <div>
-                <p className="section-kicker">Kitchen order #{group.wo_no}</p>
+                <p className="section-kicker">{kitchenTicket(group.wo_no)}</p>
                 <h3 className="ow-heading">{group.merchant?.display_name ?? 'No kitchen assigned'}</h3>
                 <p className="muted-line">
                   {group.merchant?.location_label ?? 'No location label'}
@@ -153,7 +164,7 @@ export function KitchensSection({
                       className={status === steps[0] ? 'primary-button' : 'ghost-button'}
                       type="button"
                       onClick={() => {
-                        if (status === 'COMPLETED' && !window.confirm(`Mark kitchen order #${group.wo_no} as delivered?`)) return
+                        if (status === 'COMPLETED' && !window.confirm(`Mark ${kitchenPart(order.order_no, group.merchant?.display_name, order.fulfillment_groups.length)} as delivered?`)) return
                         onMove(group.wo_no, status)
                       }}
                       disabled={busy !== null}
@@ -242,7 +253,7 @@ export function DeliverySection({
 
         {unassigned.length ? (
           <div className="ow-assign">
-            <p className="section-kicker">{rider ? 'Assign remaining kitchen orders' : 'Assign a rider'}</p>
+            <p className="section-kicker">{rider ? 'Assign the remaining kitchens' : 'Assign a rider'}</p>
             {riders === null ? (
               <p className="muted-line"><LoaderCircle className="is-spinning" size={14} /> Loading riders…</p>
             ) : candidates.length === 0 ? (
@@ -266,7 +277,7 @@ export function DeliverySection({
                   onClick={() => onAssign(Number(riderUid))}
                 >
                   {busy === 'assign' ? <LoaderCircle className="is-spinning" size={15} /> : <Bike size={15} />}
-                  Assign to {unassigned.length} kitchen order{unassigned.length === 1 ? '' : 's'}
+                  {order.fulfillment_groups.length > 1 ? `Assign to ${kitchenCount(unassigned.length)}` : 'Assign rider'}
                 </button>
               </div>
             )}
@@ -316,7 +327,7 @@ export function CustomerSection({ order, onSearchCustomer }: { order: AdminOrder
         <ul className="ow-items">
           {order.fulfillment_groups.map((group) => (
             <li key={group.wo_no}>
-              <span>{group.merchant?.display_name ?? `#${group.wo_no}`}</span>
+              <span>{group.merchant?.display_name ?? kitchenTicket(group.wo_no)}</span>
               <strong>{formatMoney(group.subtotal_amount)}</strong>
             </li>
           ))}
@@ -327,7 +338,7 @@ export function CustomerSection({ order, onSearchCustomer }: { order: AdminOrder
             <ul className="ow-items">
               {payouts.map((group) => (
                 <li key={group.wo_no}>
-                  <span>{group.rider?.display_name ?? `#${group.wo_no}`} · {(group.payout_status ?? '').toLowerCase()}</span>
+                  <span>{group.rider?.display_name ?? 'Rider'} · {(group.payout_status ?? '').toLowerCase()}</span>
                   <strong>{formatMoney(group.payout_amount)}</strong>
                 </li>
               ))}

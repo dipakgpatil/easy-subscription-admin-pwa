@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { acknowledgeDispatchIncident, getDispatchIncidents } from '../../lib/api'
-import type { DispatchIncident, DispatchIncidentResult } from '../../lib/types'
+import type { DispatchIncidentResult } from '../../lib/types'
+import { incidentDetail, incidentTitle } from './incidentText'
 
 type Props = { token: string }
 
@@ -10,11 +11,6 @@ const EMPTY: DispatchIncidentResult = { total: 0, page: 1, pageSize: 25, items: 
 function dateTime(value: string | null): string {
   if (!value) return 'Not yet'
   return new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
-}
-
-function incidentDetail(incident: DispatchIncident): string {
-  const entries = Object.entries(incident.details ?? {})
-  return entries.map(([key, value]) => `${key.replaceAll('_', ' ')}: ${String(value)}`).join(' | ')
 }
 
 export default function DispatchView({ token }: Props) {
@@ -75,8 +71,8 @@ export default function DispatchView({ token }: Props) {
             <article className="list-card" key={incident.id}>
               <div className="list-card-top">
                 <div>
-                  <strong>{incident.title}</strong>
-                  <span>Customer order #{incident.parent_wo_no} | {incident.service_zone_code ?? 'No zone'}</span>
+                  <strong>{incidentTitle(incident)}</strong>
+                  <span>Order #{incident.parent_wo_no} | {incident.service_zone_code ?? 'No zone'}</span>
                 </div>
                 <span className={`badge ${incident.status_cd === 'OPEN' ? 'is-warning' : 'is-neutral'}`}>{incident.status_cd}</span>
               </div>

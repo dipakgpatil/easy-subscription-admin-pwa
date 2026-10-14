@@ -129,6 +129,12 @@ assignment; riders load only when this opens), Customer & payment, and Activity 
 demand). Shared formatting lives in `src/lib/format.ts`; the call button in
 `src/lib/ContactAction.tsx`.
 
+An order has one number everywhere a person sees it: the customer's (`order_no`). Each kitchen's
+part is a fulfilment group whose `wo_no` keys `PUT /admin/orders/{wo_no}/status` and merchant
+mark-paid; show it only as `kitchenTicket()` ("Kitchen ticket 178", never with a "#"). Search and
+`GET /admin/orders/{n}` accept either number and return the customer's order. Merchant payout rows
+carry both (`order_no` to show, `wo_no` to settle).
+
 ## Live updates (`src/lib/liveEvents.ts`)
 
 `connectAdminOrderStream` reads `order.created`, `order.updated` and `rider.updated` from

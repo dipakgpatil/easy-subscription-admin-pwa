@@ -17,7 +17,7 @@ import type { AdminOrderDetail, AdminRiderListItem } from '../../lib/types'
 import { badgeTone, formatMoney } from '../../lib/format'
 import { ContactAction } from '../../lib/ContactAction'
 import { ActivitySection, CustomerSection, DeliverySection, KitchensSection, OverviewSection } from './OrderSections'
-import { formatTime, isFinished, issueLabel, orderAge, stageLabel, type OrderSection } from './orderUtils'
+import { formatTime, isFinished, issueLabel, kitchenCount, orderAge, stageLabel, type OrderSection } from './orderUtils'
 
 type Props = {
   token: string
@@ -117,7 +117,7 @@ export default function OrderWorkspace({ token, orderNo, onBack, onChanged, onSe
       }
       await load()
       onChanged()
-      setMessage(`Rider assigned to ${targets.length} kitchen order${targets.length === 1 ? '' : 's'}.`)
+      setMessage(order.fulfillment_groups.length > 1 ? `Rider assigned to ${kitchenCount(targets.length)}.` : 'Rider assigned.')
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to assign the rider.')
     } finally {

@@ -71,6 +71,24 @@ export function isFinished(status: string): boolean {
   return ['COMPLETED', 'DELIVERED', 'CANCELLED', 'CANCELED', 'REJECTED'].includes(status.toUpperCase())
 }
 
+/**
+ * Every order has one number, the customer's (`order_no`). Each kitchen's part of it is a
+ * fulfilment group whose `wo_no` keys the status actions; show that only as an internal
+ * ticket, never with a "#", so nobody quotes it as a second order number.
+ */
+export function kitchenTicket(woNo: number): string {
+  return `Kitchen ticket ${woNo}`
+}
+
+/** "order #177", or "Pizza Hut's part of order #177" when the order is split across kitchens. */
+export function kitchenPart(orderNo: number, kitchenName: string | null | undefined, kitchens: number): string {
+  return kitchens > 1 ? `${kitchenName ?? 'one kitchen'}'s part of order #${orderNo}` : `order #${orderNo}`
+}
+
+export function kitchenCount(count: number): string {
+  return `${count} kitchen${count === 1 ? '' : 's'}`
+}
+
 export type DatePreset = 'ANY' | 'TODAY' | 'YESTERDAY' | 'WEEK' | 'MONTH'
 
 export const DATE_PRESETS: { key: DatePreset; label: string }[] = [

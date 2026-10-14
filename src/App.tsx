@@ -1450,7 +1450,8 @@ function App() {
                         {selectedPayout.orders.map((order) => (
                           <tr key={order.wo_no}>
                             <td>
-                              <strong>#{order.wo_no}</strong>
+                              {/* The customer's number; wo_no is this kitchen's ticket (older APIs sent only that). */}
+                              <strong>#{order.order_no ?? order.wo_no}</strong>
                               <span>{formatDateTime(order.earned_at)}</span>
                             </td>
                             <td>{order.customer_name ?? 'Guest'}</td>
