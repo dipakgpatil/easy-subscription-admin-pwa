@@ -11,7 +11,7 @@ import type {
   AdminOrderCreatedEvent,
   AdminOrderSearchResult,
   AdminRiderSettlementView,
-  RiderSettlementMethod,
+  SettlementMethod,
   OperationalEventResult,
   ObservabilitySummary,
   AdminReferralAnalytics,
@@ -947,21 +947,35 @@ export async function getRiderSettlement(token: string, riderUid: number): Promi
   return request<AdminRiderSettlementView>(`/admin/riders/${encodeURIComponent(String(riderUid))}/settlement`, { token })
 }
 
+/** How a payment was made and when: what every settlement records, rider or merchant. */
+export type SettlementPayment = {
+  paymentMethod: SettlementMethod
+  /** UPI or bank transaction number; required for UPI and bank transfers. */
+  reference?: string
+  /** YYYY-MM-DD, India time. */
+  paidOn: string
+  note?: string
+}
+
+function settlementPaymentBody(payment: SettlementPayment) {
+  return {
+    payment_method: payment.paymentMethod,
+    reference: payment.reference?.trim() || null,
+    paid_on: payment.paidOn,
+    note: payment.note?.trim() || null,
+  }
+}
+
 /** Settles everything pending for the rider. Refused (409) if the net changed since it was reviewed. */
 export async function settleRider(
   token: string,
   riderUid: number,
-  settlement: { paymentMethod: RiderSettlementMethod; reference?: string; note?: string; expectedNetAmount: string },
+  settlement: SettlementPayment & { expectedNetAmount: string },
 ): Promise<AdminRiderSettlementView> {
   return request<AdminRiderSettlementView>(`/admin/riders/${encodeURIComponent(String(riderUid))}/settlements`, {
     method: 'POST',
     token,
-    body: {
-      payment_method: settlement.paymentMethod,
-      reference: settlement.reference?.trim() || null,
-      note: settlement.note?.trim() || null,
-      expected_net_amount: settlement.expectedNetAmount,
-    },
+    body: { ...settlementPaymentBody(settlement), expected_net_amount: settlement.expectedNetAmount },
   })
 }
 
@@ -991,15 +1005,19 @@ export async function getMerchantPayoutDetail(token: string, merchantUid: number
   return request<AdminMerchantPayoutDetail>(`/admin/merchants/${merchantUid}/payouts`, { token })
 }
 
-export async function markMerchantPayoutPaid(
+/**
+ * Records a payment to a kitchen for exactly these kitchen tickets. Refused (409) if any of them
+ * was settled or changed since the list was reviewed; orders completed since stay pending.
+ */
+export async function settleMerchant(
   token: string,
   merchantUid: number,
-  payload: { payoutReference?: string; note?: string; orderNos?: number[] },
+  settlement: SettlementPayment & { woNos: number[]; expectedAmount: string },
 ): Promise<AdminMerchantPayoutDetail> {
-  return request<AdminMerchantPayoutDetail>(`/admin/merchants/${merchantUid}/payouts/mark-paid`, {
+  return request<AdminMerchantPayoutDetail>(`/admin/merchants/${encodeURIComponent(String(merchantUid))}/settlements`, {
     method: 'POST',
     token,
-    body: payload,
+    body: { ...settlementPaymentBody(settlement), wo_nos: settlement.woNos, expected_amount: settlement.expectedAmount },
   })
 }
 

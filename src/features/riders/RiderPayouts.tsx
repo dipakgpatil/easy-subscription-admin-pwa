@@ -3,18 +3,9 @@ import { BadgeCheck, LoaderCircle } from 'lucide-react'
 
 import { ApiError, getRiderSettlement, settleRider } from '../../lib/api'
 import { formatDateTime, formatMoney } from '../../lib/format'
-import type { AdminRiderListItem, AdminRiderSettlementView, RiderSettlementMethod } from '../../lib/types'
-
-const METHODS: { value: RiderSettlementMethod; label: string }[] = [
-  { value: 'UPI', label: 'UPI' },
-  { value: 'BANK_TRANSFER', label: 'Bank transfer' },
-  { value: 'CASH', label: 'Cash' },
-  { value: 'OTHER', label: 'Other' },
-]
-
-function methodLabel(value: string): string {
-  return METHODS.find((method) => method.value === value)?.label ?? value
-}
+import type { AdminRiderListItem, AdminRiderSettlementView } from '../../lib/types'
+import SettlementPaymentFields from '../payouts/SettlementPaymentFields'
+import { formatDay, methodLabel, newPaymentDraft, type PaymentDraft } from '../payouts/settlementPayment'
 
 function amount(value: string): number {
   const parsed = Number.parseFloat(value)
@@ -49,9 +40,7 @@ function shortDate(value: string): string {
 export default function RiderPayouts({ token, rider, onSettled }: { token: string; rider: AdminRiderListItem; onSettled: () => void }) {
   const [view, setView] = useState<AdminRiderSettlementView | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [method, setMethod] = useState<RiderSettlementMethod>('UPI')
-  const [reference, setReference] = useState('')
-  const [note, setNote] = useState('')
+  const [draft, setDraft] = useState<PaymentDraft>(() => newPaymentDraft())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
@@ -80,20 +69,21 @@ export default function RiderPayouts({ token, rider, onSettled }: { token: strin
           ? `Confirm ${rider.display_name} has handed you ${money(net)}`
           : 'Earnings and cash cancel out'
     const scope = `${view.pending.deliveries_count} deliveries and ${view.pending.cash_orders_count} cash orders will be marked settled.`
-    if (!window.confirm(`${action}. ${scope}`)) return
+    const when = `Paid on ${formatDay(draft.paidOn)} by ${methodLabel(draft.method)}${draft.reference.trim() ? `, ${draft.reference.trim()}` : ''}.`
+    if (!window.confirm(`${action}. ${when} ${scope}`)) return
     setBusy(true)
     setError(null)
     setMessage(null)
     try {
       const next = await settleRider(token, rider.rider_uid, {
-        paymentMethod: method,
-        reference,
-        note,
+        paymentMethod: draft.method,
+        reference: draft.reference,
+        paidOn: draft.paidOn,
+        note: draft.note,
         expectedNetAmount: view.pending.net_amount,
       })
       setView(next)
-      setReference('')
-      setNote('')
+      setDraft(newPaymentDraft(draft.method))
       setMessage(`Settled. ${rider.display_name} can see it in the rider app.`)
       onSettled()
     } catch (reason) {
@@ -136,20 +126,7 @@ export default function RiderPayouts({ token, rider, onSettled }: { token: strin
         {hasPending ? (
           <form className="payout-form" onSubmit={settle}>
             <div className="merchant-form-grid">
-              <label>
-                Paid by
-                <select value={method} onChange={(event) => setMethod(event.target.value as RiderSettlementMethod)}>
-                  {METHODS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                </select>
-              </label>
-              <label>
-                Reference (optional)
-                <input value={reference} onChange={(event) => setReference(event.target.value)} maxLength={120} placeholder="UPI or bank reference" />
-              </label>
-              <label className="merchant-form-wide">
-                Note (optional)
-                <input value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} />
-              </label>
+              <SettlementPaymentFields draft={draft} amount={net} onChange={setDraft} />
             </div>
             {error ? <p className="error-banner">{error}</p> : null}
             <div className="merchant-form-actions">
@@ -187,7 +164,8 @@ export default function RiderPayouts({ token, rider, onSettled }: { token: strin
         <ul className="ow-summary-list payout-items">
           {view.settlements.map((settlement) => (
             <li key={settlement.settlement_id}>
-              <span className="muted-line">{formatDateTime(settlement.settled_at)}</span>
+              {/* The day the money moved; settlements recorded before it was asked for show when they were entered. */}
+              <span className="muted-line">{settlement.paid_on ? formatDay(settlement.paid_on) : formatDateTime(settlement.settled_at)}</span>
               <span>
                 <strong>{settledLine(amount(settlement.net_amount))}</strong>
                 <span className="muted-line">

@@ -318,7 +318,7 @@ export type AdminMerchantPayoutSummaryResult = {
 }
 
 export type AdminMerchantPayoutOrder = {
-  /** This kitchen's ticket: what mark-paid takes. */
+  /** This kitchen's ticket: what a settlement lists. */
   wo_no: number
   /** The customer's order number, the one to show. Absent from APIs before it was added. */
   order_no?: number
@@ -328,14 +328,31 @@ export type AdminMerchantPayoutOrder = {
   payout_amount: string
   payout_status: string
   settled_at: string | null
+  settlement_id?: number | null
   customer_name: string | null
   service_zone_code: string | null
   delivery_address: string | null
 }
 
+/** One payment to a kitchen for a set of its completed orders. Dates are India-time days. */
+export type AdminMerchantSettlement = {
+  settlement_id: number
+  paid_on: string
+  settled_at: string
+  amount: string
+  orders_count: number
+  orders_from: string
+  orders_to: string
+  payment_method: SettlementMethod
+  reference: string | null
+  note: string | null
+}
+
 export type AdminMerchantPayoutDetail = {
   summary: AdminMerchantPayoutSummary
   orders: AdminMerchantPayoutOrder[]
+  /** Newest first. Absent from APIs before merchant settlements were recorded. */
+  settlements?: AdminMerchantSettlement[]
 }
 
 export type AdminDashboard = {
@@ -734,12 +751,14 @@ export type RiderSettlement = {
   net_amount: string
   deliveries_count: number
   cash_orders_count: number
-  payment_method: RiderSettlementMethod
+  payment_method: SettlementMethod
   reference: string | null
   note: string | null
+  /** Day the money moved (India time). Null on settlements recorded before it was asked for. */
+  paid_on?: string | null
 }
 
-export type RiderSettlementMethod = 'UPI' | 'BANK_TRANSFER' | 'CASH' | 'OTHER'
+export type SettlementMethod = 'UPI' | 'BANK_TRANSFER' | 'CASH' | 'OTHER'
 
 export type AdminRiderSettlementItem = {
   kind: 'EARNING' | 'CASH'

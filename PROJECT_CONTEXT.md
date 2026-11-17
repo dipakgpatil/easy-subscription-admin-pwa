@@ -46,7 +46,8 @@ The app defaults to `https://easy-subscription-python-api-production.up.railway.
 - `/admin/riders` and `/admin/riders/live`
 - `/admin/merchants/payouts`
 - `/admin/merchants/{merchantUid}/payouts`
-- `/admin/merchants/{merchantUid}/payouts/mark-paid`
+- `/admin/merchants/{merchantUid}/settlements`
+- `/admin/riders/{riderUid}/settlement` and `/admin/riders/{riderUid}/settlements`
 - `/admin/referrals/config`
 - `/admin/referrals/analytics`
 - `/admin/referrals`
@@ -131,7 +132,7 @@ demand). Shared formatting lives in `src/lib/format.ts`; the call button in
 
 An order has one number everywhere a person sees it: the customer's (`order_no`). Each kitchen's
 part is a fulfilment group whose `wo_no` keys `PUT /admin/orders/{wo_no}/status` and merchant
-mark-paid; show it only as `kitchenTicket()` ("Kitchen ticket 178", never with a "#"). Search and
+settlements; show it only as `kitchenTicket()` ("Kitchen ticket 178", never with a "#"). Search and
 `GET /admin/orders/{n}` accept either number and return the customer's order. Merchant payout rows
 carry both (`order_no` to show, `wo_no` to settle).
 
@@ -148,6 +149,18 @@ Every screen keeps its periodic refresh as the fallback: never rely on the strea
 List first (state tabs with counts, search, New rider), then `RiderWorkspace`: live state,
 current order (opens it in Orders), recent orders (`/admin/orders?riderUid=`), profile, zones,
 Suspend/Activate. Creating a rider upserts by email, so the form refuses an email already in use.
+The workspace's Payouts section (`RiderPayouts.tsx`) settles earnings against cash held.
+
+## Payouts (`src/features/payouts/`)
+
+Rider and merchant settlements record a payment made outside Cravix, with the same fields
+(`SettlementPaymentFields`): Paid on (India-time day, never in the future), Paid by, the UPI or bank
+transaction number (required for UPI and bank transfers; the API refuses one already recorded on any
+settlement) and a note. The Payouts tab's detail is `MerchantPayouts.tsx`: it lists the kitchen's
+pending orders, and "Orders completed up to" picks the cycle being paid. It sends exactly those
+kitchen tickets with their total, so orders completed meanwhile wait for the next payment, and a 409
+(an order changed or was paid first) reloads the list. It loads its own detail and is not refreshed
+by the dashboard poll, so the list being paid does not move underneath the admin.
 
 ## Design layer
 

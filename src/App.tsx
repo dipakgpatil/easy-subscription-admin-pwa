@@ -20,6 +20,7 @@ import McpConnectView from './features/mcp/McpConnectView'
 import MerchantsView from './features/merchants/MerchantsView'
 import OrdersView from './features/orders/OrdersView'
 import OperationsView from './features/operations/OperationsView'
+import MerchantPayouts from './features/payouts/MerchantPayouts'
 import { clearPendingMcpConnect, takePendingMcpConnect } from './features/mcp/mcpConnect'
 import { SearchDemandView } from './features/search/SearchDemandView'
 import {
@@ -32,14 +33,12 @@ import {
   creditReferralWallet,
   getDashboard,
   getOrderHistory,
-  getMerchantPayoutDetail,
   getMerchantPayouts,
   getReferralAnalytics,
   getReferralConfig,
   getReferralList,
   listProductSubmissions,
   loginAdminWithMockGoogleProfile,
-  markMerchantPayoutPaid,
   rejectProductSubmission,
   requestAdminOtp,
   runReferralTest,
@@ -59,7 +58,6 @@ import {
 import type {
   AdminDashboard,
   AdminOrderHistory,
-  AdminMerchantPayoutDetail,
   AdminMerchantPayoutSummary,
   AdminMerchantPayoutSummaryResult,
   AdminOrderCreatedEvent,
@@ -145,7 +143,6 @@ function App() {
   const [referralAnalytics, setReferralAnalytics] = useState<AdminReferralAnalytics | null>(null)
   const [referralList, setReferralList] = useState<AdminReferralListResult | null>(null)
   const [selectedMerchantUid, setSelectedMerchantUid] = useState<number | null>(null)
-  const [selectedPayout, setSelectedPayout] = useState<AdminMerchantPayoutDetail | null>(null)
   const [googleEmail, setGoogleEmail] = useState('ops.cravix@gmail.com')
   const [googleGivenName, setGoogleGivenName] = useState('Ops')
   const [googleFamilyName, setGoogleFamilyName] = useState('Lead')
@@ -160,8 +157,6 @@ function App() {
   const [referralStatus, setReferralStatus] = useState('')
   const [referralRewardStatus, setReferralRewardStatus] = useState('')
   const [referralPage, setReferralPage] = useState(1)
-  const [payoutReference, setPayoutReference] = useState('')
-  const [payoutNote, setPayoutNote] = useState('')
   const [referralRefereeUserId, setReferralRefereeUserId] = useState('')
   const [referralCodeDraft, setReferralCodeDraft] = useState('')
   const [referralDeviceId, setReferralDeviceId] = useState('')
@@ -279,17 +274,8 @@ function App() {
     )
     if (payload.items.length === 0) {
       setSelectedMerchantUid(null)
-      setSelectedPayout(null)
     }
   }, [deferredPayoutQuery, payoutPage, session])
-
-  const loadSelectedPayout = useCallback(async () => {
-    if (!session || selectedMerchantUid === null) {
-      return
-    }
-    const payload = await getMerchantPayoutDetail(session.access_token, selectedMerchantUid)
-    setSelectedPayout(payload)
-  }, [selectedMerchantUid, session])
 
   const loadReferralAdmin = useCallback(async () => {
     if (!session) {
@@ -328,8 +314,9 @@ function App() {
         await loadOrderHistory()
       }
       if (activeTab === 'payouts') {
+        // The selected kitchen's payout panel loads its own detail and keeps the list it is
+        // settling steady; a refresh only updates the queue.
         await loadPayouts()
-        await loadSelectedPayout()
       }
       if (activeTab === 'referrals') {
         await loadReferralAdmin()
@@ -350,7 +337,6 @@ function App() {
     loadOrderHistory,
     loadPayouts,
     loadReferralAdmin,
-    loadSelectedPayout,
     session,
   ])
 
@@ -399,13 +385,6 @@ function App() {
     }
   }
 
-
-  useEffect(() => {
-    if (!session || activeTab !== 'payouts' || selectedMerchantUid === null) {
-      return
-    }
-    void loadSelectedPayout().catch((error) => setLastError(getErrorMessage(error)))
-  }, [session, activeTab, selectedMerchantUid, loadSelectedPayout])
 
   useEffect(() => {
     if (!session || activeTab === 'catalog') {
@@ -603,29 +582,6 @@ function App() {
     writeSidebarCollapsed(sidebarCollapsed)
   }, [sidebarCollapsed])
 
-  async function handleMarkPayoutPaid() {
-    if (!session || selectedMerchantUid === null) {
-      return
-    }
-    setLoadingKey('payout-paid')
-    setLastError(null)
-    try {
-      const payload = await markMerchantPayoutPaid(session.access_token, selectedMerchantUid, {
-        payoutReference: payoutReference.trim() || undefined,
-        note: payoutNote.trim() || undefined,
-      })
-      setSelectedPayout(payload)
-      await loadOverview()
-      await loadPayouts()
-      setPayoutReference('')
-      setPayoutNote('')
-    } catch (error) {
-      setLastError(getErrorMessage(error))
-    } finally {
-      setLoadingKey(null)
-    }
-  }
-
   async function handleSaveReferralConfig() {
     if (!session || !referralConfig) {
       return
@@ -747,7 +703,6 @@ function App() {
     setSelectedOrderNo(null)
     setPayouts(null)
     setSelectedMerchantUid(null)
-    setSelectedPayout(null)
     setReferralConfig(null)
     setReferralAnalytics(null)
     setReferralList(null)
@@ -1404,70 +1359,18 @@ function App() {
             </section>
 
             <section className="panel detail-panel">
-              {selectedPayout ? (
-                <>
-                  <div className="panel-head">
-                    <div>
-                      <p className="section-kicker">Merchant Detail</p>
-                      <h2>{selectedPayout.summary.merchant_name}</h2>
-                    </div>
-                    <span className="badge is-warning">{formatMoney(selectedPayout.summary.pending_payout_amount)} due</span>
-                  </div>
-
-                  <div className="cards-grid">
-                    <DetailCard title="Pending" body={formatMoney(selectedPayout.summary.pending_payout_amount)} meta={`${selectedPayout.summary.pending_orders} orders`} />
-                    <DetailCard title="Paid" body={formatMoney(selectedPayout.summary.paid_payout_amount)} meta="Settled externally" />
-                    <DetailCard title="Total Earned" body={formatMoney(selectedPayout.summary.total_payout_amount)} meta={`${selectedPayout.summary.completed_orders} completed`} />
-                    <DetailCard title="Last Settlement" body={formatDateTime(selectedPayout.summary.last_paid_at)} meta={selectedPayout.summary.location_label ?? 'No location label'} />
-                  </div>
-
-                  <div className="settlement-box">
-                    <label>
-                      Reference
-                      <input value={payoutReference} onChange={(event) => setPayoutReference(event.target.value)} placeholder="bank-transfer-001" />
-                    </label>
-                    <label>
-                      Notes
-                      <textarea value={payoutNote} onChange={(event) => setPayoutNote(event.target.value)} placeholder="Settled externally through bank transfer" rows={3} />
-                    </label>
-                    <button className="primary-button" onClick={() => void handleMarkPayoutPaid()} disabled={loadingKey === 'payout-paid'}>
-                      {loadingKey === 'payout-paid' ? 'Marking paid...' : 'Mark pending payouts paid'}
-                    </button>
-                  </div>
-
-                  <div className="table-wrap">
-                    <table className="ops-table">
-                      <thead>
-                        <tr>
-                          <th>Order</th>
-                          <th>Customer</th>
-                          <th>Zone</th>
-                          <th>Payout</th>
-                          <th>Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedPayout.orders.map((order) => (
-                          <tr key={order.wo_no}>
-                            <td>
-                              {/* The customer's number; wo_no is this kitchen's ticket (older APIs sent only that). */}
-                              <strong>#{order.order_no ?? order.wo_no}</strong>
-                              <span>{formatDateTime(order.earned_at)}</span>
-                            </td>
-                            <td>{order.customer_name ?? 'Guest'}</td>
-                            <td>{order.service_zone_code ?? 'No zone'}</td>
-                            <td>{formatMoney(order.payout_amount)}</td>
-                            <td>
-                              <span className={`badge ${badgeTone(order.payout_status)}`}>{order.payout_status}</span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
+              {session && selectedMerchantUid !== null ? (
+                <MerchantPayouts
+                  key={selectedMerchantUid}
+                  token={session.access_token}
+                  merchantUid={selectedMerchantUid}
+                  onSettled={() => {
+                    void loadPayouts().catch((error) => setLastError(getErrorMessage(error)))
+                    void loadOverview().catch((error) => setLastError(getErrorMessage(error)))
+                  }}
+                />
               ) : (
-                <EmptyState title="Select a merchant" body="Choose a merchant from the left panel to inspect due amounts and mark payouts settled." />
+                <EmptyState title="Select a merchant" body="Choose a merchant from the left panel to see what is due and record a payment." />
               )}
             </section>
           </section>
@@ -1794,16 +1697,6 @@ function StatCard({ label, value, tone }: { label: string; value: string; tone: 
     <article className={`stat-card tone-${tone}`}>
       <span>{label}</span>
       <strong>{value}</strong>
-    </article>
-  )
-}
-
-function DetailCard({ title, body, meta }: { title: string; body: string; meta: string }) {
-  return (
-    <article className="detail-card">
-      <span>{title}</span>
-      <strong>{body}</strong>
-      <small>{meta}</small>
     </article>
   )
 }
